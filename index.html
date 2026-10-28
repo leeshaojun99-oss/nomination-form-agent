@@ -1,0 +1,1266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nomination Form Agent</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#fff; --ink:#15181d; --muted:#5f6670; --line:#dde1e6;
+  --head:#111418; --accent:#1f6feb; --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e;
+  --okbg:#e6f4ea; --warnbg:#fff4d6; --badbg:#fde7e9;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--head);color:#fff;padding:18px 16px}
+header h1{margin:0;font-size:20px}
+header p{margin:4px 0 0;color:#b8bec7;font-size:13px}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.card h2{margin:0 0 4px;font-size:17px}
+.step{display:inline-block;background:var(--head);color:#fff;border-radius:50%;width:24px;height:24px;text-align:center;line-height:24px;font-size:13px;margin-right:8px}
+.hint{color:var(--muted);font-size:13px;margin:0 0 12px}
+button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:7px;padding:8px 14px;cursor:pointer}
+button.go{background:var(--ok);border-color:var(--ok);color:#fff}
+button.small{padding:3px 10px;font-size:13px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0}
+.tile{border:1px solid var(--line);border-radius:8px;padding:10px}
+.tile b{display:block;font-size:24px}
+.tile span{font-size:12px;color:var(--muted)}
+.tile.ok{background:var(--okbg)} .tile.warn{background:var(--warnbg)} .tile.bad{background:var(--badbg)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#f0f2f5;font-weight:600}
+.pill{display:inline-block;border-radius:99px;padding:1px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--okbg);color:var(--ok)} .pill.warn{background:var(--warnbg);color:var(--warn)} .pill.bad{background:var(--badbg);color:var(--bad)}
+ul.issues{margin:0;padding-left:18px}
+ul.issues li.e{color:var(--bad)} ul.issues li.w{color:var(--warn)}
+.msg{padding:10px 12px;border-radius:8px;margin-top:10px;font-size:14px}
+.msg.ok{background:var(--okbg)} .msg.bad{background:var(--badbg)} .msg.warn{background:var(--warnbg)}
+select,input[type=text]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;max-width:100%}
+.hidden{display:none!important}
+iframe#previewFrame{width:100%;height:760px;border:1px solid var(--line);border-radius:8px;margin-top:10px;background:#fff}
+.qgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 14px;margin:12px 0}
+.qgrid label{display:flex;flex-direction:column;font-size:13px;color:var(--muted);gap:3px}
+.qgrid input,.qgrid select,#nomTable input,#nomTable select{color:var(--ink);width:100%}
+input.found,select.found{background:#eaf5ec;border-color:#9fd3ab}
+textarea{font:inherit;font-size:13px;width:100%;min-height:110px;padding:8px;border:1px solid var(--line);border-radius:6px}
+h3{font-size:15px;margin:16px 0 6px}
+.chip{display:inline-block;margin:4px 6px 0 0}
+.sub{border:1px solid var(--line);border-radius:8px;padding:4px 14px 10px;margin-top:14px;background:#fafbfc}
+label.inline{display:flex;gap:6px;align-items:center;font-size:14px;margin:4px 0}
+.opt{border-radius:99px;padding:5px 14px;font-size:13px}
+.opt.on{background:var(--head);border-color:var(--head);color:#fff}
+.person{border-top:1px dashed var(--line);padding-top:8px;margin-top:8px}
+.person b{font-size:13px}
+pre.log{background:#0f1115;color:#d6dae0;padding:12px;border-radius:8px;font-size:12px;max-height:260px;overflow:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header>
+  <h1>Nomination Form Agent</h1>
+  <p>Upload the policy PDF → it checks every detail → you approve → it fills the Appointment / Change of Nominee(s) form for every customer. Data never leaves this computer.</p>
+</header>
+
+<main>
+  <section class="card" id="quickCard">
+    <h2><span class="step">1</span>Add a customer from their policy PDF</h2>
+    <p class="hint">Upload the customer's policy PDF (for example the ePartner Policy Detail page saved with Ctrl+P → Save as PDF). The app reads what it can and fills the boxes below in <span style="background:#eaf5ec;padding:0 4px">green</span> — check them and complete the rest. Then fill parts 2–5 and click <b>Add customer</b> at the bottom. Repeat for more customers.</p>
+    <div class="row"><input type="file" id="polPdf" accept=".pdf" multiple></div>
+    <div id="polMsg"></div>
+    <div class="qgrid">
+      <label>Policy No.<input type="text" id="q_policy_no" list="polList"><datalist id="polList"></datalist></label>
+      <label>Proposal No. (optional)<input type="text" id="q_proposal_no"></label>
+      <label>Policyowner full name (as per NRIC)<input type="text" id="q_owner_name"></label>
+      <label>Policyowner NRIC / Passport<input type="text" id="q_owner_ic"></label>
+      <label>Are you a Muslim?<select id="q_owner_muslim"><option value="">— choose —</option><option>No</option><option>Yes</option></select></label>
+      <label>Marital status<select id="q_owner_status"><option value="">— choose —</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></label>
+      <label>No. of children (0 = none)<input type="text" id="q_owner_children"></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">2</span>Nominees</h2>
+    <p class="hint">Paste your WhatsApp nomination details — the table fills automatically — or type them into the table. Put postcode and town inside the address; the app splits them out.</p>
+    <textarea id="waText" placeholder="*Nominee 1*&#10;Name: ...&#10;IC: ...&#10;Address: ...&#10;Relationship: ...&#10;Percentages: 100%"></textarea>
+    <div class="row" style="margin-top:8px"><button id="waParse">Read nominees from text</button><span id="waMsg" class="hint" style="margin:0"></span></div>
+    <div id="nomSuggest"></div>
+    <div class="tablewrap" style="margin-top:10px"><table id="nomTable"></table></div>
+    <div class="row" style="margin-top:8px"><span class="pill" id="shareChip">Shares 0% of 100%</span></div>
+    <div class="row" style="margin-top:12px">
+      <label>If a nominee's country is blank, fill in: <input type="text" id="defCountry" value="MALAYSIA" size="12"></label>
+      <span class="hint" style="margin:0">(clear this box to leave blank countries blank)</span>
+    </div>
+  </section>
+
+  <section class="card">
+      <h2><span class="step">3</span>Declaration <span class="hint">page 3</span></h2>
+      <div class="qgrid"><label>Date signed (leave blank to write by hand)<input type="date" id="q_date"></label></div>
+      <label class="inline"><input type="checkbox" id="q_wit_agent" checked> Witness is an agent (only name and IAC no. needed)</label>
+      <div class="qgrid" id="witAgentBox">
+        <label>Witness name<input type="text" id="q_wit_name"></label>
+        <label>IAC no.<input type="text" id="q_wit_iac"></label>
+      </div>
+      <div class="qgrid hidden" id="witFullBox">
+        <label>Witness full name (as per NRIC)<input type="text" id="q_witf_name"></label>
+        <label>NRIC / Passport<input type="text" id="q_witf_ic"></label>
+        <label>Date of birth (passport only)<input type="text" id="q_witf_dob" placeholder="DD/MM/YYYY"></label>
+        <label>Passport expiry (passport only)<input type="text" id="q_witf_expiry" placeholder="DD/MM/YYYY"></label>
+        <label style="grid-column:1/-1">Mailing address (incl. postcode &amp; town)<input type="text" id="q_witf_address"></label>
+      </div>
+      <p class="hint">Must be over 18, of sound mind, and not the policyowner, a nominee or a trustee.</p>
+  </section>
+
+  <section class="card">
+      <h2><span class="step">4</span>Trustees <span class="hint">form Part 2 · skip unless this is a trust policy</span></h2>
+      <div class="hint" style="margin:0 0 6px">Choose one</div>
+      <div class="row" id="trusteeOpts"></div>
+      <div id="trusteeBox" class="hidden"></div>
+  </section>
+
+  <section class="card">
+      <h2><span class="step">5</span>Consent of existing nominee(s) / trustee(s) <span class="hint">form Part 3</span></h2>
+      <p class="hint">Only needed when the current nomination is a trust policy: the existing nominees or trustees must consent to it being revoked. If there are any, paste their details (Name / IC) below — or click <b>Add person</b> and type them.</p>
+      <textarea id="consentText" style="min-height:80px" placeholder="*Person 1*&#10;Name: ...&#10;IC: ...&#10;&#10;*Person 2*&#10;Name: ...&#10;IC: ..."></textarea>
+      <div class="row" style="margin-top:8px"><button id="consentParse">Read people from text</button><button id="consentAdd">Add person</button><span id="consentMsg" class="hint" style="margin:0"></span></div>
+      <div id="consentBox"></div>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <button class="go" id="quickAdd">Add customer → check</button>
+      <button id="quickClear">Start over (clear added customers)</button>
+      <span id="quickCount" class="hint" style="margin:0"></span>
+    </div>
+    <div id="quickMsg"></div>
+  </section>
+
+  <section class="card hidden" id="excelCard">
+    <h2><span class="step">1</span>…or load a whole Excel list</h2>
+    <p class="hint">Excel (.xlsx) or CSV, one row per nominee. A policy with 3 nominees has 3 rows with the same policy number. Start from the blank template so the columns match.</p>
+    <div class="row">
+      <input type="file" id="dataFile" accept=".xlsx,.xls,.csv">
+      <button id="sampleBtn">Use sample data (test only)</button>
+      <button id="templateBtn">Download blank template</button>
+    </div>
+    <div id="loadMsg"></div>
+  </section>
+
+  <section class="card hidden" id="digestCard">
+    <h2><span class="step">6</span>Review the check results</h2>
+    <p class="hint"><b>Red</b> = blocked, will NOT be filled until fixed — correct the details above and add the customer again. <b>Amber</b> = will be filled, but read the note — anything the app wasn't sure about is left blank for you to write in.</p>
+    <div class="tiles" id="tiles"></div>
+    <div class="tablewrap"><table id="policyTable"></table></div>
+    <div class="row" style="margin-top:10px"><button id="fixListBtn">Download fix list (CSV)</button></div>
+  </section>
+
+  <section class="card hidden" id="previewCard">
+    <h2><span class="step">7</span>Preview the filled form</h2>
+    <p class="hint">Exactly what will be printed, marked PREVIEW. Check page 1–2 against your records.</p>
+    <div class="row"><label>Policy: <select id="previewSel"></select></label><button id="previewBtn">Show preview</button></div>
+    <div id="previewMsg"></div>
+    <iframe id="previewFrame" class="hidden" title="Form preview"></iframe>
+  </section>
+
+  <section class="card hidden" id="approveCard">
+    <h2><span class="step">8</span>Approve &amp; generate</h2>
+    <p class="hint">Nothing final is produced until you approve. Only green and amber policies are included.</p>
+    <div class="row">
+      <label>Reviewed by: <input type="text" id="reviewer" placeholder="Your name"></label>
+      <label><input type="checkbox" id="approveChk"> I have reviewed the check results and the preview</label>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="go" id="genBtn" disabled>Approve → generate filled forms (PDF)</button></div>
+    <div id="genMsg"></div>
+    <div class="tablewrap"><table id="outTable"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Run log</h2>
+    <p class="hint">Every run is recorded in this browser on this computer. Download it any time.</p>
+    <div class="row"><button id="logDl">Download log</button><button id="logClear">Clear log</button></div>
+    <pre class="log" id="logView"></pre>
+  </section>
+</main>
+
+<script>
+const FORM_B64 = "__FORM_B64__";
+</script>
+<script>
+// ===== ENGINE START (shared with the test script; no DOM use in here) =====
+const FIELDS = [
+  {key:'policy_no',     label:'Policy No.',                 req:true,  aliases:['policy no','policy number','policy','no polisi']},
+  {key:'proposal_no',   label:'Proposal No.',               req:false, aliases:['proposal no','proposal number','no cadangan']},
+  {key:'owner_name',    label:'Policyowner Full Name',      req:true,  aliases:['policyowner name','policy owner name','owner name','customer name','client name','name','proposer name']},
+  {key:'owner_ic',      label:'Policyowner NRIC/Passport',  req:true,  aliases:['policyowner ic','owner ic','customer ic','client ic','ic','ic no','nric','owner nric','policyowner nric']},
+  {key:'owner_muslim',  label:'Policyowner Muslim (Yes/No)',req:false, aliases:['muslim','is muslim','owner muslim','are you a muslim']},
+  {key:'owner_status',  label:'Policyowner Marital Status', req:false, aliases:['status','marital status','owner status']},
+  {key:'owner_children',label:'No. of Children',            req:false, aliases:['children','no of children','number of children','any children']},
+  {key:'nominee_name',  label:'Nominee Full Name',          req:true,  aliases:['nominee name','nominee','beneficiary name','beneficiary']},
+  {key:'nominee_ic',    label:'Nominee NRIC/Passport',      req:true,  aliases:['nominee ic','nominee nric','nominee ic no','nominee id','nominee passport','nominee nric passport']},
+  {key:'nominee_passport_expiry', label:'Nominee Passport Expiry (DD/MM/YYYY)', req:false, aliases:['passport expiry','nominee passport expiry','passport expiry date']},
+  {key:'nominee_gender',label:'Nominee Gender (M/F)',       req:false, aliases:['gender','nominee gender','sex']},
+  {key:'nominee_dob',   label:'Nominee Date of Birth (DD/MM/YYYY)', req:false, aliases:['dob','date of birth','nominee dob','nominee date of birth']},
+  {key:'nominee_nationality', label:'Nominee Nationality', req:false, aliases:['nationality','nominee nationality']},
+  {key:'nominee_relationship', label:'Relationship',        req:true,  aliases:['relationship','nominee relationship','relation','hubungan']},
+  {key:'nominee_share', label:'Share %',                    req:true,  aliases:['share','share %','share (%)','percentage','%','nominee share']},
+  {key:'nominee_address',label:'Nominee Mailing Address',   req:false, aliases:['nominee address','mailing address','address','nominee mailing address']},
+  {key:'nominee_postcode',label:'Nominee Postcode',         req:false, aliases:['postcode','nominee postcode','poskod']},
+  {key:'nominee_town',  label:'Nominee Town',               req:false, aliases:['town','city','nominee town','bandar']},
+  {key:'nominee_country',label:'Nominee Country',           req:false, aliases:['country','nominee country','negara']},
+];
+const norm = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9%]/g,'');
+const ALIAS = {};
+FIELDS.forEach(f => [f.key, f.label, ...f.aliases].forEach(a => ALIAS[norm(a)] = f.key));
+const FLABEL = Object.fromEntries(FIELDS.map(f => [f.key, f.label]));
+const OWNER_KEYS = ['proposal_no','owner_name','owner_ic','owner_muslim','owner_status','owner_children'];
+const NOMINEE_KEYS = FIELDS.map(f => f.key).filter(k => k.startsWith('nominee_'));
+const MAX_NOMINEES = 4;
+
+// ----- Box positions on the 6-page form (points from top-left; measured from the blank form) -----
+const R = (x0,x1,n,y,h) => ({x0, pitch:(x1-x0)/n, n, y, h});
+const B = (x,y,s) => ({x, y, s});
+const REL = ['Husband','Wife','Son','Daughter','Father','Mother','Brother','Sister','Others'];
+function nomBlock(page, X, Y){
+  return {page,
+    name: Y.name.map(y => R(X.name[0], X.name[1], 28, y, 13.7)),
+    ic: R(X.left, X.icEnd, 12, Y.ic, 13.7),
+    exp: {d:R(...X.d, 2, Y.ic, 13.3), m:R(...X.m, 2, Y.ic, 13.3), y:R(...X.y, 2, Y.ic, 13.3)},
+    dob: {d:R(...X.d, 2, Y.g, 13.3), m:R(...X.m, 2, Y.g, 13.3), y:R(...X.y, 2, Y.g, 13.3)},
+    share: {i:R(...X.si, 3, Y.share, 9.3), d:R(...X.sd, 2, Y.share, 9.3)},
+    male: B(X.male, Y.g, 13.7), female: B(X.female, Y.g, 13.7),
+    natMy: B(X.left, Y.nat, 13.7), natOther: B(X.natOther, Y.nat, 13.7), natText: R(...X.natText, 16, Y.nat, 13.7),
+    rel: Object.fromEntries(REL.map((r,i) => [r, B(X.rel[i], Y.rel, X.relS)])), relText: {x:507, y:Y.rel-1.5, w:54, h:14},
+    addr: Y.addr.map(y => R(X.left, X.addrEnd, 32, y, 13.5)),
+    postcode: R(X.left, X.left + 5*(X.addrEnd-X.left)/32, 5, Y.pc, 13.5),
+    town: R(X.town, X.addrEnd, 25, Y.pc, 13.5),
+    country: R(X.left, X.countryEnd, 10, Y.country, 13.5)};
+}
+const X1 = {name:[158,561.3], left:107.3, icEnd:279.7, d:[372.3,400.4], m:[416,444], y:[457.7,486], si:[494.7,522.3], sd:[527.3,545.7],
+  male:107, female:160, natOther:160.3, natText:[259,489], rel:[107,157.7,196.3,233.7,284.7,328.7,373.7,420,462], relS:11,
+  addrEnd:554, town:205, countryEnd:246.3};
+const X2 = {name:[159,562], left:108, icEnd:280.7, d:[373,401], m:[416.7,445], y:[458.7,486.7], si:[495.3,523], sd:[528.3,546.4],
+  male:108, female:160.7, natOther:161, natText:[259.7,489.7], rel:[108,158.3,197.3,234.7,285.7,329.7,374.7,420.7,463], relS:10.7,
+  addrEnd:555, town:206, countryEnd:247.4};
+const LAYOUT = {
+  header: [
+    {page:0, prop:R(141,284.7,10,60,15.3),   pol:R(418.7,562,10,60,15.3)},
+    {page:1, prop:R(151.3,294.7,10,50.7,15), pol:R(418,561.4,10,50.7,15)},
+    {page:2, prop:R(152,295,10,46.3,14.7),   pol:R(418.7,561.6,10,46.3,14.7)},
+    {page:3, prop:R(142.3,285.7,10,44.3,14.7),pol:R(417.3,560.3,10,44.3,14.7)},
+    {page:4, prop:R(142,285.4,10,45.3,14.7), pol:R(417.7,560.6,10,45.3,14.7)}],
+  owner: {page:0, name:R(169,557.7,27,88.3,14), ic:R(169,341.3,12,106,13.7),
+    muslim:{No:B(449.7,106,8.3), Yes:B(489.3,106,8.3)},
+    status:{Married:B(73.3,123.7,6.7), Single:B(121.3,123.7,6.7), Divorced:B(165,123.7,6.7), Widowed:B(216.7,123.7,6.7)},
+    childNo:B(397,123.7,8), childYes:B(436.7,123.7,8), childCount:R(534.3,555,2,123.7,10.3)},
+  // page 3, Part 1 declaration: name boxes under the signatures (signatures themselves stay manual)
+  decl: {page:2, ownerName:{x:76.3,y:330.7,w:87.3,h:14.3}, witnessName:{x:229.3,y:330.7,w:87.3,h:14.3}, witnessIac:{x:295.3,y:349,w:79,h:14.7},
+    date:{d:R(398.7,425.6,2,285,13), m:R(440,466.6,2,285,13), y:R(481,507.7,2,285,13)},
+    part2:{appoint:B(33.7,668.7,13), add:B(33.7,682,13), revokeAppoint:B(33.7,695.3,13), revokeAll:B(33.7,709,13)}},
+};
+// person blocks (witness details / trustees): same box pattern as the nominee blocks
+function personBlock(page, o){
+  const pitch = (o.end - o.left) / 32;
+  return {page, name: o.name.map(y => R(o.nameX[0], o.nameX[1], 28, y, 13.7)), ic: R(o.nameX[0], o.icEnd, 12, o.ic, 13.7),
+    exp: o.exp && {d:R(...o.exp.d, 2, o.ic, 13.3), m:R(...o.exp.m, 2, o.ic, 13.3), y:R(...o.exp.y, 2, o.ic, 13.3)},
+    dob: {d:R(...o.dob.d, 2, o.dob.at, 13.3), m:R(...o.dob.m, 2, o.dob.at, 13.3), y:R(...o.dob.y, 2, o.dob.at, 13.3)},
+    male: o.g && B(o.left, o.g, 13.7), female: o.g && B(o.nameX[0], o.g, 13.7),
+    natMy: o.nat && B(o.left, o.nat, 13.7), natOther: o.nat && B(o.nameX[0], o.nat, 13.7), natText: o.nat && R(258, 560, 21, o.nat, 13.7),
+    cobMy: o.cob && B(o.left, o.cob, 13.7), cobOther: o.cob && B(o.nameX[0], o.cob, 13.7), cobText: o.cob && R(258, 560, 21, o.cob, 13.7),
+    tel: o.tel && R(75.7, 233.7, 11, o.tel, 13.7), telCountry: o.tel && R(266.3, 381.3, 8, o.tel, 13.7),
+    telType: o.tel && {House:B(426.7, o.tel, 13.7), Handphone:B(464.7, o.tel, 13.7), Office:B(522.3, o.tel, 13.7)},
+    addr: o.addr.map(y => R(o.left, o.end, 32, y, 13.5)), postcode: R(o.left, o.left + 5*pitch, 5, o.pc, 13.5),
+    town: R(o.town, o.end, 25, o.pc, 13.5), country: R(o.left, o.countryEnd, 10, o.country, 13.5)};
+}
+const TB = (name, ic, g, nat, cob, tel, addr, pc, country) => personBlock(3, {name, nameX:[157,560], icEnd:329.4, ic, left:100.7, end:561.3, town:201.7, countryEnd:244,
+  exp:{d:[446.7,474.7], m:[490.3,518.4], y:[532,560]}, dob:{d:[446.7,474.7], m:[490.3,518.4], y:[532,560], at:g}, g, nat, cob, tel, addr, pc, country});
+Object.assign(LAYOUT, {
+  witness3: personBlock(2, {name:[411,425], nameX:[160,563], icEnd:332.4, ic:452.3, left:111, end:558, town:209, countryEnd:250.3,
+    exp:{d:[443.7,471.7], m:[487.3,515.4], y:[529,557]}, dob:{d:[131,159], m:[174.7,202.7], y:[216.3,244.4], at:478.3}, addr:[505.7,519.7,533.7], pc:547.3, country:561.3}),
+  // page 4: Part 2 trustees + its declaration
+  trustees: [TB([81.3,95.3,109.7], 128.3, 145.7, 163, 180.3, 197.7, [214.3,228.7,242.3], 256.3, 270),
+             TB([296.7,311,325], 341.3, 357.7, 374.7, 391, 408, [425.3,439.3,453.7], 467, 480.7)],
+  decl4: {page:3, date:{d:R(227,253.7,2,670.7,13), m:R(268,295,2,670.7,13), y:R(309.3,336,2,670.7,13)},
+    owner:{x:65.3,y:755.3,w:87.3,h:14.3}, t:[{x:199.3,y:755.3,w:87.3,h:14.3},{x:331.3,y:755.3,w:87.3,h:14.3}], witness:{x:465.7,y:755.3,w:87,h:14.3}, iac:{x:497.3,y:774,w:55.3,h:14.7}},
+  // page 5: witness details for the page-4 declaration, and Part 3 consent table (4 people)
+  witness5: personBlock(4, {name:[77.3,91.3], nameX:[158.7,561.7], icEnd:331, ic:108.7, left:115, end:561.3, town:213, countryEnd:253.7,
+    exp:{d:[448.3,476], m:[492,519.6], y:[533.7,561.3]}, dob:{d:[171.3,199], m:[215,242.6], y:[256.7,284.3], at:125.7}, addr:[143.3,157.3,171.3], pc:184.7, country:198.3}),
+  consent: {page:4, cols:[[126,110],[236.3,108.7],[345.5,109.5],[455.5,108.5]],
+    rows:{name:[399,26.3], ic:[425.7,25.7], witName:[541.3,29.7], witIac:[571.3,30.3], witIc:[613.7,24.7], witDob:[638.7,23.7], witExp:[662.7,32.3],
+          witAddr:[695.3,23.3], witPc:[719,22.3], witTown:[741.7,20.7], witCountry:[762.7,22]}},
+});
+LAYOUT.nominees = [
+    nomBlock(0, X1, {name:[578,592,605.7], ic:624.3, g:643.7, share:643.7, nat:662.7, rel:682.3, addr:[699.3,713.7,727.3], pc:741, country:755}),
+    nomBlock(1, X2, {name:[89.7,104,117.7], ic:144.7, g:171.3, share:163, nat:196, rel:220.7, addr:[245,259,273], pc:286.3, country:300}),
+    nomBlock(1, X2, {name:[338.3,352.3,366], ic:390.3, g:414, share:405, nat:438.3, rel:461.7, addr:[481.7,496,509.7], pc:523.7, country:537.7}),
+    nomBlock(1, X2, {name:[570.7,585,598.3], ic:621, g:643.7, share:638, nat:666.3, rel:689.7, addr:[711.7,726,740], pc:753.7, country:767.3})];
+
+// ----- Cleaning helpers -----
+const clean = v => String(v ?? '').replace(/\s+/g,' ').trim();
+const digits = v => String(v ?? '').replace(/\D/g,'');
+const up = v => clean(v).toUpperCase();
+const printable = s => /^[\x20-\x7E]*$/.test(s);
+const pad2 = n => String(n).padStart(2,'0');
+function icInfo(raw){
+  const v = clean(raw);
+  if(!v) return {empty:true};
+  if(/e\+/i.test(v)) return {excelDamaged:true, value:v};
+  const d = digits(v);
+  if(/^[\d\s-]+$/.test(v) && d.length === 11) return {lostZero:true, value:v};
+  if(/[a-z]/i.test(v) || d.length !== 12) return {notMyKad:true, value:up(v).replace(/[^A-Z0-9]/g,'')};
+  const yy=+d.slice(0,2), mm=+d.slice(2,4), dd=+d.slice(4,6);
+  const year = (yy > new Date().getFullYear() % 100 ? 1900 : 2000) + yy;
+  const dt = new Date(year, mm-1, dd);
+  if(mm<1||mm>12||dt.getMonth()!==mm-1||dt.getDate()!==dd) return {badDate:true, value:d};
+  const now = new Date(); let age = now.getFullYear()-year;
+  if(now < new Date(now.getFullYear(), mm-1, dd)) age--;
+  return {ok:true, value:d, pretty:`${d.slice(0,6)}-${d.slice(6,8)}-${d.slice(8)}`, age, dob:{d:dd, m:mm, y:year}, gender: (+d[11] % 2) ? 'M' : 'F'};
+}
+function parseDate(v){
+  if(v instanceof Date && !isNaN(v)) return {d:v.getDate(), m:v.getMonth()+1, y:v.getFullYear()};
+  const s = clean(v); if(!s) return null;
+  let m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/), d, mo, y;
+  if(m){ d=+m[1]; mo=+m[2]; y=+m[3]; }
+  else if((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))){ y=+m[1]; mo=+m[2]; d=+m[3]; }
+  else return {bad:true};
+  const dt = new Date(y, mo-1, d);
+  return (dt.getMonth()===mo-1 && dt.getDate()===d) ? {d, m:mo, y} : {bad:true};
+}
+function shareNum(v){ const s = clean(v).replace('%',''); if(s==='') return null; const n = Number(s); return isFinite(n) ? n : NaN; }
+function wrap(text, rows, width){
+  const words = up(text).split(' ').filter(Boolean); const out = []; let cur = '';
+  for(const w of words){
+    if(w.length > width) return null;
+    if(!cur) cur = w; else if((cur+' '+w).length <= width) cur += ' '+w; else { out.push(cur); cur = w; }
+  }
+  if(cur) out.push(cur);
+  return out.length <= rows ? out : null;
+}
+const YES = /^(y|yes|ya|true|1|islam|muslim)$/i, NO = /^(n|no|tidak|false|0|non-?muslim)$/i;
+const STATUS = {married:'Married', berkahwin:'Married', kahwin:'Married', single:'Single', bujang:'Single',
+  divorced:'Divorced', bercerai:'Divorced', cerai:'Divorced', widowed:'Widowed', widow:'Widowed', widower:'Widowed', balu:'Widowed', duda:'Widowed'};
+const GENDER = {m:'M', male:'M', lelaki:'M', f:'F', female:'F', perempuan:'F'};
+
+// ----- Turn one policy's rows into checked form values -----
+function buildPolicies(table, opts = {}){
+  const header = table[0].map(h => clean(h));
+  const colMap = {}; const unknown = [];
+  header.forEach((h,i) => { const k = ALIAS[norm(h)]; if(k && !(k in colMap)) colMap[k]=i; else if(h) unknown.push(h); });
+  const missing = FIELDS.filter(f => f.req && !(f.key in colMap)).map(f => f.label);
+  const rows = table.slice(1).map((r,idx) => {
+    const o = {_row: idx+2};
+    FIELDS.forEach(f => { const v = f.key in colMap ? r[colMap[f.key]] : ''; o[f.key] = v instanceof Date ? v : clean(v); });
+    return o;
+  }).filter(o => FIELDS.some(f => clean(o[f.key])));
+  const skipped = []; const byPol = new Map();
+  rows.forEach(r => {
+    const pn = up(r.policy_no);
+    if(!pn){ skipped.push({row:r._row, reason:`No policy number (customer "${r.owner_name||'?'}") — row skipped`}); return; }
+    if(!byPol.has(pn)) byPol.set(pn, []);
+    byPol.get(pn).push(r);
+  });
+  const policies = [];
+  for(const [pn, rs] of byPol) policies.push(checkPolicy(pn, rs, opts));
+  return {policies, skipped, unknownCols:unknown, missingCols:missing, rawRows:rows};
+}
+
+function checkPolicy(pn, rs, opts){
+  const p = {policy_no:pn, rows:rs.map(r=>r._row), owner:{}, nominees:[], errors:[], warnings:[], form:null};
+  const E = m => p.errors.push(m), W = m => p.warnings.push(m);
+  OWNER_KEYS.forEach(k => {
+    const vals = [...new Set(rs.map(r => r[k]).filter(Boolean).map(v => k==='owner_ic' ? (digits(v)||up(v)) : up(v)))];
+    p.owner[k] = rs.map(r=>r[k]).find(Boolean) || '';
+    if(vals.length > 1) E(`${FLABEL[k]} differs between rows ${p.rows.join(', ')} — which is correct?`);
+  });
+  const f = {policy:'', proposal:'', owner:{}, nominees:[]};
+  // header
+  if(pn.length > 10 || !printable(pn)) W(`Policy no. "${pn}" doesn't fit the 10 boxes — write it by hand`); else f.policy = pn;
+  const prop = up(p.owner.proposal_no);
+  if(prop){ if(prop.length > 10) W(`Proposal no. "${prop}" doesn't fit the 10 boxes — write it by hand`); else f.proposal = prop; }
+  // owner
+  const oname = up(p.owner.owner_name);
+  if(!oname) E('Policyowner name missing');
+  else if(!printable(oname)) W('Policyowner name has characters the form font cannot print — write it by hand');
+  else if(oname.length > 27) W(`Policyowner name is ${oname.length} letters; the form has 27 boxes — write it by hand`);
+  else f.owner.name = oname;
+  if(oname && printable(oname)) f.owner.declName = oname;   // free-size box under the signature, so no 27-letter limit
+  const oic = icInfo(p.owner.owner_ic);
+  if(oic.empty) E('Policyowner IC missing');
+  else if(oic.excelDamaged) E(`Policyowner IC "${oic.value}" was damaged by Excel — format the IC column as Text and re-type it`);
+  else if(oic.lostZero) E(`Policyowner IC "${oic.value}" has 11 digits — Excel probably dropped a leading 0`);
+  else if(oic.badDate) E(`Policyowner IC "${p.owner.owner_ic}" has an impossible date of birth`);
+  else if(oic.notMyKad){ W(`Policyowner ID "${p.owner.owner_ic}" is not a 12-digit MyKad no. — confirm it is a passport no.`); if(oic.value.length <= 12) f.owner.ic = oic.value; else W('Policyowner ID too long for the 12 boxes — write it by hand'); }
+  else { f.owner.ic = oic.value; p.owner.owner_ic = oic.pretty; if(oic.age < 18) W(`Policyowner appears to be under 18 (age ${oic.age} from IC)`); }
+  const mus = clean(p.owner.owner_muslim);
+  if(!mus) W('"Are you a Muslim?" not given — tick by hand');
+  else if(YES.test(mus)) f.owner.muslim = 'Yes'; else if(NO.test(mus)) f.owner.muslim = 'No';
+  else W(`"Muslim" value "${mus}" not understood (use Yes/No) — tick by hand`);
+  const st = clean(p.owner.owner_status);
+  if(!st) W('Marital status not given — tick by hand');
+  else if(STATUS[st.toLowerCase()]) f.owner.status = STATUS[st.toLowerCase()];
+  else W(`Marital status "${st}" not understood (use Married/Single/Divorced/Widowed) — tick by hand`);
+  const ch = clean(p.owner.owner_children);
+  if(!ch) W('Number of children not given — tick by hand');
+  else if(NO.test(ch)) f.owner.children = 0;
+  else if(/^\d{1,2}$/.test(ch)) f.owner.children = +ch;
+  else W(`Children value "${ch}" not understood (use a number, 0 for none) — tick by hand`);
+
+  // nominees
+  if(rs.length > MAX_NOMINEES) E(`${rs.length} nominees — the form has room for ${MAX_NOMINEES}. Fill extra nominees on an additional page by hand`);
+  let total = 0; const seen = new Set();
+  rs.forEach((r,i) => {
+    const n = {}; NOMINEE_KEYS.forEach(k => n[k] = r[k]);
+    const tag = `Nominee ${i+1}${n.nominee_name?` (${n.nominee_name})`:''}, row ${r._row}`;
+    const nf = {};
+    const nm = up(n.nominee_name);
+    if(!nm) E(`${tag}: name missing`);
+    else if(!printable(nm)) W(`${tag}: name has characters the form font cannot print — write it by hand`);
+    else { const lines = wrap(nm, 3, 28); if(lines) nf.name = lines; else W(`${tag}: name too long for the boxes — write it by hand`); }
+
+    const nic = icInfo(n.nominee_ic); let gender = null, dob = null;
+    const icBad = !nic.ok && !nic.notMyKad;  // already reported as an error below
+    if(nic.empty) E(`${tag}: NRIC/passport missing`);
+    else if(nic.excelDamaged) E(`${tag}: IC "${nic.value}" was damaged by Excel — format the IC column as Text and re-type it`);
+    else if(nic.lostZero) E(`${tag}: IC "${nic.value}" has 11 digits — Excel probably dropped a leading 0`);
+    else if(nic.badDate) E(`${tag}: IC "${n.nominee_ic}" has an impossible date of birth`);
+    else if(nic.notMyKad){
+      W(`${tag}: ID "${n.nominee_ic}" is not a 12-digit MyKad no. — confirm it is a passport no.`);
+      if(nic.value.length <= 12) nf.ic = nic.value; else W(`${tag}: ID too long for the 12 boxes — write it by hand`);
+    } else {
+      nf.ic = nic.value; n.nominee_ic = nic.pretty; gender = nic.gender; dob = nic.dob; n.age = nic.age;
+      if(nic.age < 18) W(`${tag}: nominee is a minor (age ${nic.age} from IC) — check what the form/company needs for minors`);
+      if(nic.value === digits(p.owner.owner_ic)) E(`${tag}: nominee IC is the same as the policyowner's`);
+    }
+    const key = digits(n.nominee_ic) || nm;
+    if(key && seen.has(key)) E(`${tag}: duplicate nominee on this policy`);
+    seen.add(key);
+
+    // gender: column, cross-checked with MyKad
+    const gcol = GENDER[clean(n.nominee_gender).toLowerCase()];
+    if(clean(n.nominee_gender) && !gcol) W(`${tag}: gender "${n.nominee_gender}" not understood (use M/F)`);
+    if(gcol && gender && gcol !== gender) E(`${tag}: gender says ${gcol} but the IC no. indicates ${gender}`);
+    gender = gcol || gender;
+    if(gender) nf.gender = gender; else if(!icBad) W(`${tag}: gender unknown (not a MyKad and no Gender given) — tick by hand`);
+
+    // date of birth: from MyKad, or the column for passports
+    const dcol = parseDate(n.nominee_dob);
+    if(dcol && dcol.bad) W(`${tag}: date of birth "${n.nominee_dob}" not understood (use DD/MM/YYYY)`);
+    else if(dcol && dob && (dcol.d!==dob.d || dcol.m!==dob.m || dcol.y!==dob.y)) E(`${tag}: date of birth ${dcol.d}/${dcol.m}/${dcol.y} doesn't match the IC no.`);
+    if(!dob && dcol && !dcol.bad){ dob = dcol; const now = new Date(); let age = now.getFullYear()-dob.y; if(now < new Date(now.getFullYear(), dob.m-1, dob.d)) age--; if(age < 18) W(`${tag}: nominee is a minor (age ${age}) — check what the form/company needs for minors`); }
+    if(dob) nf.dob = dob; else if(!(dcol && dcol.bad) && !icBad) W(`${tag}: date of birth not given — write it by hand`);
+
+    const exp = parseDate(n.nominee_passport_expiry);
+    if(exp && exp.bad) W(`${tag}: passport expiry "${n.nominee_passport_expiry}" not understood (use DD/MM/YYYY)`);
+    else if(exp){ nf.exp = exp; if(new Date(exp.y, exp.m-1, exp.d) < new Date()) W(`${tag}: passport has expired`); }
+    else if(nic.notMyKad) W(`${tag}: passport expiry date not given — write it by hand`);
+
+    // nationality
+    const nat = up(n.nominee_nationality);
+    if(!nat) W(`${tag}: nationality not given — tick by hand`);
+    else if(/^(MALAYSIAN?|WARGANEGARA( MALAYSIA)?)$/.test(nat)) nf.nat = {my:true};
+    else if(nat.length <= 16 && printable(nat)) nf.nat = {other:nat};
+    else W(`${tag}: nationality "${nat}" too long for the boxes — write it by hand`);
+
+    // relationship
+    const relRaw = clean(n.nominee_relationship); const rl = relRaw.toLowerCase();
+    let rel = null;
+    if(!relRaw) E(`${tag}: relationship missing`);
+    else if(/^(husband|suami)$/.test(rl)) rel = 'Husband';
+    else if(/^(wife|isteri|isteri)$/.test(rl)) rel = 'Wife';
+    else if(/^(son|anak lelaki)$/.test(rl)) rel = 'Son';
+    else if(/^(daughter|anak perempuan)$/.test(rl)) rel = 'Daughter';
+    else if(/^(father|bapa|ayah)$/.test(rl)) rel = 'Father';
+    else if(/^(mother|ibu|emak)$/.test(rl)) rel = 'Mother';
+    else if(/^(brother|abang|adik lelaki)$/.test(rl)) rel = 'Brother';
+    else if(/^(sister|kakak|adik perempuan)$/.test(rl)) rel = 'Sister';
+    else if(/^(spouse|pasangan)$/.test(rl)){ if(gender) rel = gender==='M' ? 'Husband' : 'Wife'; else W(`${tag}: "Spouse" — can't tell Husband/Wife without gender — tick by hand`); }
+    else if(/^(child|anak)$/.test(rl)){ if(gender) rel = gender==='M' ? 'Son' : 'Daughter'; else W(`${tag}: "Child" — can't tell Son/Daughter without gender — tick by hand`); }
+    else rel = 'Others';
+    if(rel){
+      nf.rel = rel;
+      if(rel === 'Others'){ if(up(relRaw).length <= 12 && printable(relRaw)) nf.relOther = up(relRaw); else W(`${tag}: relationship "${relRaw}" too long for the Others box — write it by hand`); }
+      const male = ['Husband','Son','Father','Brother'].includes(rel), female = ['Wife','Daughter','Mother','Sister'].includes(rel);
+      if(gender && ((male && gender==='F') || (female && gender==='M'))) W(`${tag}: relationship "${rel}" doesn't match gender ${gender} — check`);
+    }
+
+    // share
+    const s = shareNum(n.nominee_share);
+    if(s === null) E(`${tag}: share % missing`);
+    else if(isNaN(s) || s <= 0 || s > 100) E(`${tag}: share "${n.nominee_share}" is not a valid % (more than 0, up to 100)`);
+    else if(Math.round(s*100) !== +(s*100).toFixed(6)) E(`${tag}: share ${s} has more than 2 decimal places — the form allows 2`);
+    else { n.nominee_share = s; total += s; nf.share = s; }
+
+    // address
+    let addr = clean(n.nominee_address), pc = digits(n.nominee_postcode) ? clean(n.nominee_postcode) : '', town = up(n.nominee_town);
+    if(addr && !pc){
+      const m = [...addr.matchAll(/\b(\d{5})\b/g)];
+      if(m.length === 1){
+        pc = m[0][1];
+        const after = addr.slice(m[0].index + 5).replace(/^[\s,]+/,'');
+        if(!town) town = up(after.replace(/[\s,]+$/,''));
+        addr = addr.slice(0, m[0].index).replace(/[\s,]+$/,'');
+        W(`${tag}: postcode ${pc}${town?` and town ${town}`:''} taken from the address automatically — check`);
+      }
+    }
+    if(!addr) W(`${tag}: mailing address not given — write it by hand`);
+    else if(!printable(addr)) W(`${tag}: address has characters the form font cannot print — write it by hand`);
+    else { const lines = wrap(addr, 3, 32); if(lines) nf.addr = lines; else W(`${tag}: address too long for the 3 lines of boxes — write it by hand`); }
+    if(pc){ if(/^\d{5}$/.test(pc)) nf.postcode = pc; else W(`${tag}: postcode "${pc}" is not 5 digits — write it by hand`); }
+    else if(addr) W(`${tag}: postcode not given — write it by hand`);
+    if(town){ if(town.length <= 25 && printable(town)) nf.town = town; else W(`${tag}: town "${town}" too long for the boxes — write it by hand`); }
+    else if(addr) W(`${tag}: town not given — write it by hand`);
+    let country = up(n.nominee_country);
+    if(!country && opts.defaultCountry && addr) country = up(opts.defaultCountry);
+    if(country){ if(country.length <= 10 && printable(country)) nf.country = country; else W(`${tag}: country "${country}" too long for the 10 boxes — write it by hand`); }
+    else if(addr) W(`${tag}: country not given — write it by hand`);
+
+    n.gender = gender;
+    p.nominees.push(n); f.nominees.push(nf);
+  });
+  if(p.nominees.every(n => typeof n.nominee_share === 'number') && Math.abs(total-100) > 0.001)
+    E(`Shares add up to ${+total.toFixed(2)}%, not 100%`);
+  checkExtras(p, f, (opts.extras || {})[pn], opts);
+  p.form = f;
+  p.status = p.errors.length ? 'bad' : p.warnings.length ? 'warn' : 'ok';
+  return p;
+}
+
+// ----- One person's details for a box block (witness / trustee). Same rules as nominees: never guess, flag instead. -----
+function personForm(raw, tag, W, E, opts, {natWidth = 21, trustee = false} = {}){
+  const nf = {}; raw = raw || {};
+  const nm = up(raw.name);
+  if(!nm) E(`${tag}: name missing`);
+  else if(!printable(nm)) W(`${tag}: name has characters the form font cannot print — write it by hand`);
+  else { const l = wrap(nm, trustee ? 3 : 2, 28); if(l) nf.name = l; else W(`${tag}: name too long for the boxes — write it by hand`); }
+  nf.fullName = nm;
+  const ic = icInfo(raw.ic);
+  if(ic.empty) E(`${tag}: NRIC/passport missing`);
+  else if(ic.badDate) E(`${tag}: IC "${raw.ic}" has an impossible date of birth`);
+  else if(ic.lostZero || ic.excelDamaged) E(`${tag}: IC "${raw.ic}" looks damaged — re-type it`);
+  else if(ic.notMyKad){ W(`${tag}: ID "${raw.ic}" is not a 12-digit MyKad no. — confirm it is a passport no.`); if(ic.value.length <= 12) nf.ic = ic.value; else W(`${tag}: ID too long for the 12 boxes — write it by hand`); }
+  else { nf.ic = ic.value; nf.dob = ic.dob; nf.gender = ic.gender; nf.age = ic.age; }
+  nf.icDigits = digits(raw.ic) || up(raw.ic);
+  const g = GENDER[clean(raw.gender).toLowerCase()];
+  if(g && nf.gender && g !== nf.gender) E(`${tag}: gender says ${g} but the IC no. indicates ${nf.gender}`);
+  nf.gender = nf.gender || g;
+  const dob = parseDate(raw.dob);
+  if(dob && dob.bad) W(`${tag}: date of birth "${raw.dob}" not understood (use DD/MM/YYYY)`);
+  else if(dob && !nf.dob){ nf.dob = dob; const now = new Date(); nf.age = now.getFullYear() - dob.y - (now < new Date(now.getFullYear(), dob.m-1, dob.d) ? 1 : 0); }
+  if(!nf.dob && ic.notMyKad && !(dob && dob.bad)) W(`${tag}: date of birth not given — write it by hand`);
+  const exp = parseDate(raw.expiry);
+  if(exp && exp.bad) W(`${tag}: passport expiry "${raw.expiry}" not understood (use DD/MM/YYYY)`);
+  else if(exp){ nf.exp = exp; if(new Date(exp.y, exp.m-1, exp.d) < new Date()) W(`${tag}: passport has expired`); }
+  if(trustee){
+    if(!nf.gender && !ic.empty) W(`${tag}: gender unknown — tick by hand`);
+    for(const [k, label] of [['nationality','nationality'], ['cob','country of birth']]){
+      const v = up(raw[k]);
+      if(!v) W(`${tag}: ${label} not given — tick by hand`);
+      else if(/^(MALAYSIAN?|WARGANEGARA( MALAYSIA)?)$/.test(v)) nf[k] = {my:true};
+      else if(v.length <= natWidth && printable(v)) nf[k] = {other:v};
+      else W(`${tag}: ${label} "${v}" too long for the boxes — write it by hand`);
+    }
+    let tel = digits(raw.tel);
+    if(!tel) W(`${tag}: phone no. not given — write it by hand`);
+    else {
+      if(/^0/.test(tel)){ tel = '6' + tel; W(`${tag}: phone written as +${tel} (Malaysia code 60 added) — check`); nf.telCountry = 'MALAYSIA'; }
+      if(tel.length <= 11) nf.tel = tel; else W(`${tag}: phone no. too long for the 11 boxes — write it by hand`);
+    }
+    if(raw.telType) nf.telType = raw.telType; else if(tel) W(`${tag}: phone type (House/Handphone/Office) not chosen — tick by hand`);
+  }
+  if(raw.address !== undefined){
+    let addr = clean(raw.address), pc = '', town = '';
+    const m = [...addr.matchAll(/\b(\d{5})\b/g)];
+    if(m.length === 1){ pc = m[0][1]; town = up(addr.slice(m[0].index + 5).replace(/^[\s,]+/,'').replace(/[\s,]+$/,'')); addr = addr.slice(0, m[0].index).replace(/[\s,]+$/,''); }
+    if(!addr) W(`${tag}: address not given — write it by hand`);
+    else if(!printable(addr)) W(`${tag}: address has characters the form font cannot print — write it by hand`);
+    else { const l = wrap(addr, 3, 32); if(l) nf.addr = l; else W(`${tag}: address too long for the 3 lines of boxes — write it by hand`); }
+    if(pc) nf.postcode = pc; else if(addr) W(`${tag}: postcode not found in the address — write it by hand`);
+    if(town){ if(town.length <= 25) nf.town = town; else W(`${tag}: town "${town}" too long for the boxes — write it by hand`); }
+    else if(addr) W(`${tag}: town not found after the postcode — write it by hand`);
+    const country = up(raw.country) || (addr ? up(opts.defaultCountry) : '');
+    if(country){ if(country.length <= 10) nf.country = country; else W(`${tag}: country "${country}" too long for the 10 boxes — write it by hand`); }
+    nf.addrText = [addr, pc, town].filter(Boolean).join(' ');
+  }
+  return nf;
+}
+
+// ----- Declaration date & witness, Part 2 trustees, Part 3 consent -----
+const TRUSTEE_OPTIONS = {none:'No trustee', appoint:'Appoint trustee(s)', add:'Add to existing trustee(s)', revokeAppoint:'Revoke all & appoint new', revokeAll:'Revoke all existing'};
+function checkExtras(p, f, ex, opts){
+  if(!ex) return;
+  const E = m => p.errors.push(m), W = m => p.warnings.push(m);
+  const ownerIc = digits(p.owner.owner_ic), nomineeIcs = p.nominees.map(n => digits(n.nominee_ic)).filter(Boolean);
+  f.decl = {};
+  if(ex.date){ const d = parseDate(ex.date); if(!d || d.bad) W(`Date signed "${ex.date}" not understood — write it by hand`); else { f.decl.date = d; if(new Date(d.y, d.m-1, d.d) > new Date()) W(`Date signed ${ex.date} is in the future — check`); } }
+  else W('Date signed left blank — write it on pages 3' + (ex.trusteeOption && ex.trusteeOption !== 'none' ? ' and 4' : '') + ' at signing');
+  const w = ex.witness || {};
+  if(w.agent){
+    f.decl.witness = {agent:true, name:up(w.name), iac:clean(w.iac)};
+    if(!clean(w.name)) W('Witness (agent) name blank — write it by hand');
+    if(!clean(w.iac)) W('Witness IAC no. blank — write it by hand');
+  } else {
+    const wf = personForm(w, 'Witness', W, E, opts);
+    if(wf.age != null && wf.age < 18) E(`Witness is under 18 (age ${wf.age}) — the form requires a witness over 18`);
+    if(wf.icDigits && wf.icDigits === ownerIc) E('Witness cannot be the policyowner');
+    if(wf.icDigits && nomineeIcs.includes(wf.icDigits)) E('Witness cannot be one of the nominees');
+    f.decl.witness = {agent:false, ...wf};
+  }
+  // Part 2
+  const opt = ex.trusteeOption || 'none';
+  f.trustee = {option:opt, people:[]};
+  if(opt !== 'none' && opt !== 'revokeAll'){
+    const people = (ex.trustees || []).filter(t => clean(t.name) || clean(t.ic));
+    if(!people.length) E(`Part 2 "${TRUSTEE_OPTIONS[opt]}" chosen but no trustee entered`);
+    if(people.length > 2) E(`${people.length} trustees — the form has room for 2`);
+    people.slice(0, 2).forEach((t, i) => {
+      const tf = personForm(t, `Trustee ${i+1}`, W, E, opts, {trustee:true});
+      if(tf.icDigits && tf.icDigits === ownerIc) E(`Trustee ${i+1}: the policyowner cannot appoint themself as trustee`);
+      if(tf.age != null && tf.age < 18) W(`Trustee ${i+1} is under 18 (age ${tf.age}) — check they can act as trustee`);
+      if(f.decl.witness && f.decl.witness.icDigits && f.decl.witness.icDigits === tf.icDigits) E(`Witness cannot also be Trustee ${i+1}`);
+      f.trustee.people.push(tf);
+    });
+  }
+  if(opt !== 'none') W(`Part 2: "${TRUSTEE_OPTIONS[opt]}" — page 4 must be signed by the policyowner${opt === 'revokeAll' ? '' : ', the trustee(s)'} and the witness`);
+  // Part 3
+  const cons = (ex.consent || []).filter(c => clean(c.name) || clean(c.ic));
+  if(cons.length > 4) E(`${cons.length} people for consent — the form has room for 4`);
+  f.consent = cons.slice(0, 4).map((c, i) => {
+    const name = up(c.name), ic = icInfo(c.ic);
+    if(!name) E(`Consent person ${i+1}: name missing`);
+    if(ic.empty) E(`Consent person ${i+1}: NRIC/passport missing`);
+    else if(ic.badDate) E(`Consent person ${i+1}: IC "${c.ic}" has an impossible date of birth`);
+    return {name, ic: ic.ok ? ic.pretty : up(c.ic)};
+  });
+  if(f.consent.length) W(`Part 3: ${f.consent.length} person(s) must sign the consent on page 5, each with a witness`);
+}
+
+// ----- Drawing onto the form -----
+async function makeFormPdf(templateBytes, policies, {watermark, witness} = {}){
+  const {PDFDocument, StandardFonts, rgb, degrees} = PDFLib;
+  const src = await PDFDocument.load(templateBytes);
+  const out = await PDFDocument.create();
+  const font = await out.embedFont(StandardFonts.Helvetica);
+  const bold = await out.embedFont(StandardFonts.HelveticaBold);
+  const srcPages = src.getPages();
+  const tplPages = await out.embedPages(srcPages);
+  const sizes = srcPages.map(pg => pg.getSize());
+  const INK = rgb(0.05, 0.1, 0.45);
+  for(const p of policies){
+    const pages = tplPages.map((tp, i) => { const {width, height} = sizes[i]; const pg = out.addPage([width, height]); pg.drawPage(tp, {x:0, y:0, width, height}); return pg; });
+    const H = pages[0].getHeight();
+    const cells = (pi, row, text, align='left') => {
+      if(!text) return; const s = String(text).toUpperCase().slice(0, row.n);
+      const start = align === 'right' ? row.n - s.length : 0;
+      const size = Math.min(9, row.h * 0.72);
+      [...s].forEach((c, i) => { if(c === ' ') return;
+        const w = font.widthOfTextAtSize(c, size);
+        pages[pi].drawText(c, {x: row.x0 + (start+i)*row.pitch + (row.pitch - w)/2, y: H - row.y - row.h/2 - size*0.35, size, font, color: INK}); });
+    };
+    const tick = (pi, b) => { const s = b.s, x = b.x, y = H - b.y - s;
+      pages[pi].drawLine({start:{x:x+s*0.18, y:y+s*0.5}, end:{x:x+s*0.42, y:y+s*0.2}, thickness:1.3, color:INK});
+      pages[pi].drawLine({start:{x:x+s*0.42, y:y+s*0.2}, end:{x:x+s*0.85, y:y+s*0.85}, thickness:1.3, color:INK}); };
+    const date = (pi, slot, d) => { if(!d) return; cells(pi, slot.d, pad2(d.d)); cells(pi, slot.m, pad2(d.m)); cells(pi, slot.y, pad2(d.y % 100)); };
+    // free text in a box: shrink to fit, wrap to 2 lines if it would get too small
+    const boxText = (pi, b, text) => {
+      if(!text) return; text = String(text).toUpperCase();
+      const w1 = s => font.widthOfTextAtSize(s, 1);
+      let size = Math.min(9, (b.w-4) / w1(text), b.h*0.65), lines = [text];
+      if(size < 5.5 && text.includes(' ')){
+        const words = text.split(' '); let best = null;
+        for(let k = 1; k < words.length; k++){ const a = words.slice(0,k).join(' '), c = words.slice(k).join(' '); const m = Math.max(w1(a), w1(c)); if(!best || m < best.m) best = {m, l:[a,c]}; }
+        lines = best.l; size = Math.min(7, (b.w-4) / best.m, (b.h-2) / 2.2);
+      }
+      lines.forEach((l, i) => { const y = H - b.y - b.h/2 + (lines.length === 2 ? (i === 0 ? size*0.55 : -size*0.95) : -size*0.35);
+        pages[pi].drawText(l, {x:b.x+2, y, size, font, color:INK}); });
+    };
+    const drawPerson = (pi, L, n) => {
+      (n.name || []).forEach((line, r) => L.name[r] && cells(pi, L.name[r], line));
+      cells(pi, L.ic, n.ic); if(L.exp) date(pi, L.exp, n.exp); date(pi, L.dob, n.dob);
+      if(L.male && n.gender) tick(pi, n.gender === 'M' ? L.male : L.female);
+      for(const k of ['nationality','cob']){ const v = n[k], pre = k === 'cob' ? 'cob' : 'nat';
+        if(v && L[pre+'My']){ if(v.my) tick(pi, L[pre+'My']); else { tick(pi, L[pre+'Other']); cells(pi, L[pre+'Text'], v.other); } } }
+      if(L.tel){ cells(pi, L.tel, n.tel); cells(pi, L.telCountry, n.telCountry); if(n.telType && L.telType[n.telType]) tick(pi, L.telType[n.telType]); }
+      (n.addr || []).forEach((line, r) => cells(pi, L.addr[r], line));
+      cells(pi, L.postcode, n.postcode); cells(pi, L.town, n.town); cells(pi, L.country, n.country);
+    };
+    const f = p.form, D = LAYOUT.decl, dec = f.decl || {}, wit = dec.witness || (witness ? {agent:true, ...witness} : null);
+    const witName = wit && (wit.agent ? wit.name : wit.fullName);
+    const fmtDate = d => d ? `${pad2(d.d)}/${pad2(d.m)}/${d.y}` : '';
+    // page 3: Part 1 declaration
+    boxText(D.page, D.ownerName, f.owner.declName);
+    date(D.page, D.date, dec.date);
+    if(wit){ boxText(D.page, D.witnessName, witName); if(wit.agent) boxText(D.page, D.witnessIac, wit.iac); else drawPerson(D.page, LAYOUT.witness3, wit); }
+    // Part 2 choice (page 3) and page 4
+    const opt = f.trustee && f.trustee.option;
+    if(opt && opt !== 'none'){
+      tick(D.page, D.part2[opt]);
+      const D4 = LAYOUT.decl4;
+      f.trustee.people.forEach((t, i) => { drawPerson(D4.page, LAYOUT.trustees[i], t); boxText(D4.page, D4.t[i], t.fullName); });
+      date(D4.page, D4.date, dec.date); boxText(D4.page, D4.owner, f.owner.declName);
+      if(wit){ boxText(D4.page, D4.witness, witName); if(wit.agent) boxText(D4.page, D4.iac, wit.iac); else drawPerson(LAYOUT.witness5.page, LAYOUT.witness5, wit); }
+    }
+    // Part 3 consent table (page 5)
+    const C = LAYOUT.consent, cell = (i, row, text) => { const [x, w] = C.cols[i], [y, h] = C.rows[row]; boxText(C.page, {x:x+2, y, w:w-4, h}, text); };
+    (f.consent || []).forEach((c, i) => {
+      cell(i, 'name', c.name); cell(i, 'ic', c.ic);
+      if(wit){ cell(i, 'witName', witName);
+        if(wit.agent) cell(i, 'witIac', wit.iac);
+        else { cell(i, 'witIc', wit.ic); cell(i, 'witDob', fmtDate(wit.dob)); cell(i, 'witExp', fmtDate(wit.exp));
+               cell(i, 'witAddr', (wit.addr || []).join(' ')); cell(i, 'witPc', wit.postcode); cell(i, 'witTown', wit.town); cell(i, 'witCountry', wit.country); } }
+    });
+    LAYOUT.header.forEach(h => { cells(h.page, h.pol, f.policy); cells(h.page, h.prop, f.proposal); });
+    const O = LAYOUT.owner;
+    cells(O.page, O.name, f.owner.name); cells(O.page, O.ic, f.owner.ic);
+    if(f.owner.muslim) tick(O.page, O.muslim[f.owner.muslim]);
+    if(f.owner.status) tick(O.page, O.status[f.owner.status]);
+    if(f.owner.children === 0) tick(O.page, O.childNo);
+    else if(f.owner.children > 0){ tick(O.page, O.childYes); cells(O.page, O.childCount, String(f.owner.children), 'right'); }
+    f.nominees.slice(0, MAX_NOMINEES).forEach((n, i) => {
+      const L = LAYOUT.nominees[i], pi = L.page;
+      (n.name || []).forEach((line, r) => cells(pi, L.name[r], line));
+      cells(pi, L.ic, n.ic);
+      date(pi, L.exp, n.exp); date(pi, L.dob, n.dob);
+      if(n.share != null){ const [a, b] = n.share.toFixed(2).split('.'); cells(pi, L.share.i, a, 'right'); cells(pi, L.share.d, b); }
+      if(n.gender) tick(pi, n.gender === 'M' ? L.male : L.female);
+      if(n.nat){ if(n.nat.my) tick(pi, L.natMy); else { tick(pi, L.natOther); cells(pi, L.natText, n.nat.other); } }
+      if(n.rel){ tick(pi, L.rel[n.rel]);
+        if(n.relOther){ const size = Math.min(8, (L.relText.w-4) / font.widthOfTextAtSize(n.relOther, 1));
+          pages[pi].drawText(n.relOther, {x:L.relText.x+2, y:H - L.relText.y - L.relText.h/2 - size*0.35, size, font, color:INK}); } }
+      (n.addr || []).forEach((line, r) => cells(pi, L.addr[r], line));
+      cells(pi, L.postcode, n.postcode); cells(pi, L.town, n.town); cells(pi, L.country, n.country);
+    });
+    if(watermark) pages.forEach(pg => pg.drawText(watermark, {x:120, y:250, size:64, font:bold, color:rgb(0.85,0.1,0.1), opacity:0.18, rotate:degrees(40)}));
+  }
+  return out.save();
+}
+// ===== ENGINE END =====
+</script>
+<script>
+const SAMPLE_CSV = `Policy No.,Policyowner Full Name,Policyowner NRIC/Passport,Policyowner Muslim (Yes/No),Policyowner Marital Status,No. of Children,Nominee Full Name,Nominee NRIC/Passport,Nominee Gender (M/F),Nominee Date of Birth (DD/MM/YYYY),Nominee Passport Expiry (DD/MM/YYYY),Nominee Nationality,Relationship,Share %,Nominee Mailing Address,Nominee Postcode,Nominee Town,Nominee Country
+5001234567,TAN WEI MING,850312-07-5521,No,Married,0,LIM SIEW LING,870805-07-6642,,,,Malaysian,Spouse,100%,"12, Jalan Sample 3, Taman Contoh, 13700 Prai, Penang",,,
+5001234578,ONG KAH HOE,790101-07-1235,No,Married,2,ONG MEI XIN,050420-07-2210,,,,Malaysian,Daughter,50,8 Lorong Contoh 2 Taman Demo,12000,Butterworth,
+5001234578,ONG KAH HOE,790101-07-1235,No,Married,2,ONG JUN JIE,150620-07-1239,,,,Malaysian,Son,50,8 Lorong Contoh 2 Taman Demo,12000,Butterworth,
+5001234589,NURUL AINA BINTI AHMAD,920715-02-5566,Yes,Single,0,AHMAD BIN SALLEH,600303-02-5011,,,,Malaysian,Father,60,21 Taman Demo,14000,Bukit Mertajam,
+5001234589,NURUL AINA BINTI AHMAD,920715-02-5566,Yes,Single,0,SITI BINTI YUSOF,,,,,Malaysian,Mother,30,21 Taman Demo,14000,Bukit Mertajam,
+5001234590,  Kumar a/l Raju ,881130-07-5003,No,Married,1,DEVI A/P KUMAR,991340-07-5222,,,,Malaysian,Daughter,100,5 Jalan Ujian,13400,Butterworth,
+,CHEAH LI YEN,900909-07-5588,No,Single,0,CHEAH BOON KEAT,620202-07-5131,,,,Malaysian,Father,100,3 Persiaran Test,11900,Bayan Lepas,
+5001234601,LEE CHONG WEI,830808-07-5151,No,Married,1,LEE MEI LING,850909-07-5252,,,,Malaysian,Spouse,70,77 Jalan Percubaan,10450,George Town,
+5001234601,LEE CHONG WEI,830808-07-5151,No,Married,1,LEE KAR HO,A12345678,M,12/03/2010,01/06/2030,Singaporean,Son,30,"10 Orchard Road #05-01",238826,Singapore,SINGAPORE`;
+
+let STATE = {file:null, rawRows:[], skipped:[], policies:[], unknownCols:[], missingCols:[]};
+let currentRun = null;
+let FORM_BYTES = null;
+const NO_BUILT_IN_FORM = FORM_B64 === '__FORM' + '_B64__';   // true in the web copy (and the un-built _build/app_src.html)
+const formBytes = () => {
+  if(FORM_BYTES) return FORM_BYTES;
+  if(NO_BUILT_IN_FORM) throw new Error('No blank form loaded yet — choose "Nomination Form.pdf" in the yellow box at the top of the page (or open NominationFormAgent.html instead).');
+  return FORM_BYTES = Uint8Array.from(atob(FORM_B64), c => c.charCodeAt(0));
+};
+
+// ---------- Logging (browser storage, with in-memory fallback) ----------
+const LOG_KEY = 'nomform_runlog_v2';
+let MEMLOG = null;
+function readLog(){ if(MEMLOG) return MEMLOG; try{ return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); }catch(e){ return MEMLOG = []; } }
+function writeLog(l){ l = l.slice(-200); try{ localStorage.setItem(LOG_KEY, JSON.stringify(l)); }catch(e){ MEMLOG = l; } }
+const ts = () => new Date().toLocaleString('en-MY',{hour12:false});
+function startRun(source){ currentRun = {id:Date.now().toString(36), started:ts(), source, steps:[]}; const l = readLog(); l.push(currentRun); writeLog(l); }
+function log(step){
+  if(!currentRun) startRun('Quick fill');
+  currentRun.steps.push(`[${new Date().toLocaleTimeString('en-MY',{hour12:false})}] ${step}`);
+  const l = readLog(); const i = l.findIndex(r => r.id === currentRun.id);
+  if(i >= 0) l[i] = currentRun; else l.push(currentRun);
+  writeLog(l); renderLog();
+}
+const logText = () => readLog().map(r => `=== Run ${r.id} | started ${r.started} | source: ${r.source}\n` + r.steps.join('\n')).join('\n\n') || '(no runs yet)';
+function renderLog(){ document.getElementById('logView').textContent = logText(); }
+
+// ---------- File reading ----------
+function parseCSV(text){
+  const rows=[]; let row=[], cur='', q=false;
+  text = text.replace(/^﻿/,'');
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(cur); cur=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=''; }
+    else cur+=c;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(v => String(v).trim()!==''));
+}
+async function readFile(file){
+  if(file.name.toLowerCase().endsWith('.csv')) return parseCSV(await file.text());
+  if(typeof XLSX === 'undefined') throw new Error('The Excel reader did not load (it needs internet the first time). Save the sheet as CSV and try again.');
+  const wb = XLSX.read(await file.arrayBuffer(), {type:'array', cellDates:true, cellNF:true});
+  const ws = wb.Sheets[wb.SheetNames[0]]; if(!ws['!ref']) return [];
+  const rg = XLSX.utils.decode_range(ws['!ref']); const out = [];
+  for(let r = rg.s.r; r <= rg.e.r; r++){
+    const row = [];
+    for(let c = rg.s.c; c <= rg.e.c; c++){
+      const cell = ws[XLSX.utils.encode_cell({r, c})];
+      if(!cell) row.push('');
+      else if(cell.t === 'd') row.push(cell.v);                                    // real Excel date
+      else if(cell.t === 'n') row.push(/%/.test(cell.z || '') ? cell.w : String(cell.v)); // keep 50% as "50%", IC numbers exact
+      else row.push(cell.w ?? String(cell.v ?? ''));
+    }
+    out.push(row);
+  }
+  return out.filter(r => r.some(v => String(v).trim()!==''));
+}
+
+// ---------- Rendering ----------
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const STATUS_TXT = {ok:'Ready', warn:'Ready – check', bad:'Blocked'};
+function renderDigest(){
+  const P = STATE.policies, c = s => P.filter(p => p.status===s).length;
+  const nom = P.reduce((a,p) => a + p.nominees.length, 0);
+  document.getElementById('tiles').innerHTML = `
+    <div class="tile"><b>${STATE.rawRows.length}</b><span>Rows read</span></div>
+    <div class="tile"><b>${P.length}</b><span>Policies · ${nom} nominees</span></div>
+    <div class="tile ok"><b>${c('ok')}</b><span>Ready</span></div>
+    <div class="tile warn"><b>${c('warn')}</b><span>Ready – please check</span></div>
+    <div class="tile bad"><b>${c('bad') + STATE.skipped.length}</b><span>Blocked / skipped</span></div>`;
+  let html = `<tr><th>Status</th><th>Policy</th><th>Policyowner</th><th>Nominees</th><th>Issues</th></tr>`;
+  const order = {bad:0, warn:1, ok:2};
+  [...P].sort((a,b) => order[a.status]-order[b.status]).forEach(p => {
+    const iss = [...p.errors.map(e=>`<li class="e">${esc(e)}</li>`), ...p.warnings.map(w=>`<li class="w">${esc(w)}</li>`)].join('');
+    html += `<tr><td><span class="pill ${p.status}">${STATUS_TXT[p.status]}</span></td><td>${esc(p.policy_no)}</td>
+      <td>${esc(p.owner.owner_name)}</td><td>${p.nominees.map(n=>esc(n.nominee_name||'?')+' ('+esc(n.nominee_share)+'%)').join('<br>')}</td>
+      <td>${iss ? `<ul class="issues">${iss}</ul>` : '—'}</td></tr>`;
+  });
+  STATE.skipped.forEach(s => html += `<tr><td><span class="pill bad">Skipped</span></td><td>—</td><td colspan="2">Row ${s.row}</td><td><ul class="issues"><li class="e">${esc(s.reason)}</li></ul></td></tr>`);
+  document.getElementById('policyTable').innerHTML = html;
+  document.getElementById('previewSel').innerHTML = P.map((p,i) => `<option value="${i}">${esc(p.policy_no)} — ${esc(p.owner.owner_name)} [${STATUS_TXT[p.status]}]</option>`).join('');
+  document.getElementById('previewFrame').classList.add('hidden');
+  document.getElementById('previewMsg').innerHTML = '';
+  document.getElementById('outTable').innerHTML = '';
+  ['digestCard','previewCard','approveCard'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+  updateButtons();
+}
+function updateButtons(){
+  const approved = document.getElementById('approveChk').checked && clean(document.getElementById('reviewer').value);
+  document.getElementById('genBtn').disabled = !(approved && STATE.policies.some(p => p.status!=='bad'));
+}
+
+// ---------- Load flow ----------
+async function loadTable(table, sourceName, extras){
+  startRun(sourceName);
+  document.getElementById('genMsg').innerHTML = '';
+  document.getElementById('approveChk').checked = false;
+  const msg = document.getElementById('loadMsg');
+  if(!table.length){ msg.innerHTML = `<div class="msg bad">The file is empty.</div>`; log('Stopped: file empty'); return; }
+  const defaultCountry = clean(document.getElementById('defCountry').value);
+  const r = buildPolicies(table, {defaultCountry, extras});
+  log(`Read ${r.rawRows.length} data rows from "${sourceName}"${defaultCountry?` (blank country → ${defaultCountry})`:''}`);
+  if(r.unknownCols.length) log(`Ignored unrecognised columns: ${r.unknownCols.join(', ')}`);
+  if(r.missingCols.length){
+    msg.innerHTML = `<div class="msg bad">Can't continue — these required columns weren't found: <b>${esc(r.missingCols.join(', '))}</b>.<br>Use the blank template's column names, or rename your headers.</div>`;
+    log(`Stopped: missing required columns: ${r.missingCols.join(', ')}`);
+    ['digestCard','previewCard','approveCard'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    return;
+  }
+  Object.assign(STATE, r, {file:sourceName});
+  const c = s => r.policies.filter(p=>p.status===s).length;
+  log(`Checked ${r.policies.length} policies: ${c('ok')} ready, ${c('warn')} ready-with-notes, ${c('bad')} blocked; ${r.skipped.length} rows skipped`);
+  r.policies.filter(p=>p.status==='bad').forEach(p => log(`  BLOCKED ${p.policy_no}: ${p.errors.join(' | ')}`));
+  r.skipped.forEach(s => log(`  SKIPPED row ${s.row}: ${s.reason}`));
+  msg.innerHTML = `<div class="msg ok">Loaded <b>${esc(sourceName)}</b>${r.unknownCols.length?` · ignored columns: ${esc(r.unknownCols.join(', '))}`:''}</div>`;
+  renderDigest();
+  log('Waiting for review & approval');
+}
+document.getElementById('dataFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if(!f) return;
+  try{ await loadTable(await readFile(f), f.name); }
+  catch(err){ document.getElementById('loadMsg').innerHTML = `<div class="msg bad">${esc(err.message)}</div>`; startRun(f.name); log('Stopped: ' + err.message); }
+  e.target.value = '';
+});
+document.getElementById('sampleBtn').onclick = () => loadTable(parseCSV(SAMPLE_CSV), 'SAMPLE DATA (dummy customers)');
+document.getElementById('templateBtn').onclick = () => {
+  const head = FIELDS.map(f => f.label);
+  if(typeof XLSX !== 'undefined'){
+    const ws = XLSX.utils.aoa_to_sheet([head]);
+    ws['!cols'] = head.map(h => ({wch: Math.max(14, h.length + 2)}));
+    for(let c = 0; c < head.length; c++) for(let r = 1; r <= 300; r++) ws[XLSX.utils.encode_cell({r, c})] = {t:'s', v:'', z:'@'};
+    ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:300,c:head.length-1}});
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Nominees');
+    XLSX.writeFile(wb, 'nomination_template.xlsx');
+  } else download('nomination_template.csv', '﻿' + head.join(',') + '\n', 'text/csv');
+};
+['approveChk','reviewer'].forEach(id => document.getElementById(id).addEventListener('input', updateButtons));
+document.getElementById('approveChk').addEventListener('change', updateButtons);
+document.getElementById('fixListBtn').onclick = () => {
+  const q = v => `"${String(v).replace(/"/g,'""')}"`;
+  const lines = ['Policy No,Policyowner,Rows in your file,Severity,Issue'];
+  STATE.policies.forEach(p => {
+    p.errors.forEach(e => lines.push([p.policy_no,p.owner.owner_name,p.rows.join(' '),'MUST FIX',e].map(q).join(',')));
+    p.warnings.forEach(w => lines.push([p.policy_no,p.owner.owner_name,p.rows.join(' '),'Check / write by hand',w].map(q).join(',')));
+  });
+  STATE.skipped.forEach(s => lines.push(['', '', s.row, 'MUST FIX', s.reason].map(q).join(',')));
+  download('fix_list.csv', '﻿' + lines.join('\n'), 'text/csv');
+  log('Downloaded fix list');
+};
+
+// ---------- Preview & generate ----------
+let previewUrl = null;
+document.getElementById('previewBtn').onclick = async () => {
+  const p = STATE.policies[+document.getElementById('previewSel').value]; if(!p) return;
+  const msg = document.getElementById('previewMsg'), fr = document.getElementById('previewFrame');
+  try{
+    const bytes = await makeFormPdf(formBytes(), [p], {watermark:'PREVIEW'});
+    if(previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
+    fr.src = previewUrl; fr.classList.remove('hidden');
+    msg.innerHTML = p.status==='bad' ? `<div class="msg bad">This policy is blocked and won't be generated until fixed:<ul class="issues">${p.errors.map(e=>`<li>${esc(e)}</li>`).join('')}</ul></div>` : '';
+    log(`Previewed ${p.policy_no}`);
+  }catch(err){ msg.innerHTML = `<div class="msg bad">Preview failed: ${esc(err.message)}</div>`; log('Preview failed: '+err.message); }
+};
+const safeName = s => String(s).replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'');
+document.getElementById('genBtn').onclick = async () => {
+  const ready = STATE.policies.filter(p => p.status!=='bad');
+  const who = clean(document.getElementById('reviewer').value);
+  const btn = document.getElementById('genBtn'); btn.disabled = true;
+  try{
+    log(`APPROVED by ${who}: generating ${ready.length} filled forms (${ready.map(p=>p.policy_no).join(', ')})`);
+    const stamp = new Date().toISOString().slice(0,10);
+    const all = await makeFormPdf(formBytes(), ready);
+    const fname = `Nomination_Forms_${stamp}_${ready.length}_policies.pdf`;
+    download(fname, all, 'application/pdf');
+    log(`Saved ${fname} (${ready.length} policies × 6 pages)`);
+    const blocked = STATE.policies.length - ready.length;
+    document.getElementById('genMsg').innerHTML = `<div class="msg ok">Saved <b>${esc(fname)}</b> to your Downloads — ${ready.length} forms, 6 pages each.${blocked?` ${blocked} blocked policies were left out.`:''}<br>Amber notes = boxes left blank for you to fill by hand. Signatures, dates and Part 2/3 (trustees, consent) stay manual.</div>`;
+    document.getElementById('outTable').innerHTML = `<tr><th>Policy</th><th>Policyowner</th><th>Left for you</th><th></th></tr>` + ready.map((p,i) =>
+      `<tr><td>${esc(p.policy_no)}</td><td>${esc(p.owner.owner_name)}</td><td>${p.warnings.length?`<ul class="issues">${p.warnings.map(w=>`<li class="w">${esc(w)}</li>`).join('')}</ul>`:'—'}</td>
+       <td><button class="small" data-i="${i}">Download this form only</button></td></tr>`).join('');
+    document.querySelectorAll('#outTable button').forEach(b => b.onclick = async () => {
+      const p = ready[+b.dataset.i]; const name = `Nomination_${safeName(p.policy_no)}_${safeName(p.owner.owner_name)}.pdf`;
+      download(name, await makeFormPdf(formBytes(), [p]), 'application/pdf'); log(`Saved ${name}`);
+    });
+  }catch(err){ document.getElementById('genMsg').innerHTML = `<div class="msg bad">Generation failed: ${esc(err.message)}</div>`; log('Generation failed: '+err.message); }
+  btn.disabled = false;
+};
+
+// ===== READER START (pure text parsing; shared with the test script) =====
+const RELS = 'Husband|Wife|Spouse|Son|Daughter|Child|Father|Mother|Brother|Sister|Grandmother|Grandfather|Uncle|Aunt|Nephew|Niece|Cousin|Fiance|Fiancee';
+const IC_RE = /\b(\d{6}-\d{2}-\d{4}|\d{12})\b/;
+// lines: array of text lines from the PDF. Returns what it could find + which policy numbers appear.
+function extractPolicyInfo(lines){
+  const text = lines.join('\n'), out = {policies:[], nominees:[]};
+  // policy numbers: prefer labelled ones ("P/N:", "Policy No")
+  const labelled = [...text.matchAll(/(?:P\/N|Policy\s*No\.?|No\.?\s*Polisi)\s*[:.]?\s*(\d{10})\b/gi)].map(m => m[1]);
+  const loose = [...text.matchAll(/(?<![\d-])(\d{10})(?![\d-])/g)].map(m => m[1]).filter(n => !/^01/.test(n));  // skip phone-like 01xxxxxxxx
+  out.policies = [...new Set(labelled.length ? labelled : loose)];
+  // policyowner: the line labelled Proposer / Policyowner, else Life Assured / Insured, else any line with an IC
+  const icLines = lines.filter(l => IC_RE.test(l));
+  const pick = icLines.find(l => /^\s*(proposer|policy\s*owner|policyowner|pemegang\s*polisi|pencadang)\b/i.test(l))
+            || icLines.find(l => /^\s*(life\s*assured|insured|assured)\b/i.test(l)) || icLines[0];
+  if(pick){
+    const ic = pick.match(IC_RE)[1];
+    out.owner_ic = ic.length === 12 ? `${ic.slice(0,6)}-${ic.slice(6,8)}-${ic.slice(8)}` : ic;
+    let before = pick.slice(0, pick.indexOf(ic))
+      .replace(/^\s*(proposer|policy\s*owner|policyowner|pemegang\s*polisi|pencadang|life\s*assured|insured|assured)\b\s*[:.]?/i, '')
+      .replace(/\s+\b(M|F|MALE|FEMALE)\s*$/i, '').trim();
+    if(/^[A-Za-z@'.\/\- ]{3,}$/.test(before)) out.owner_name = before.toUpperCase().replace(/\s+/g,' ');
+    // OCR often squashes table text ("LEESHAOJUN"): borrow the spacing from another place the same name appears
+    if(out.owner_name && !out.owner_name.includes(' ')){
+      const pat = new RegExp(out.owner_name.split('').map(ch => ch.replace(/[.\/\\]/g, '\\$&')).join('\\s*'), 'i');
+      for(const l of lines){ const m = l.match(pat); if(m && /\s/.test(m[0])){ out.owner_name = m[0].toUpperCase().replace(/\s+/g,' '); break; } }
+    }
+    // religion on any line that carries the same IC (e.g. the Life Assured row)
+    const sameIc = lines.filter(l => l.includes(ic)).join(' ');
+    if(/non[\s-]?muslim/i.test(sameIc)) out.owner_muslim = 'No';
+    else if(/\b(muslim|islam)\b/i.test(sameIc)) out.owner_muslim = 'Yes';
+  }
+  // nominee hints written as "Name (Relationship)"
+  // checked per text piece (not per joined line) so neighbouring words aren't swept into the name
+  const re = new RegExp(`^\\s*([A-Za-z][A-Za-z@'.\\/ ]{2,60}?)\\s*\\((${RELS})\\)\\s*$`, 'i'); const seen = new Set();
+  for(const m of (lines.chunks || lines).map(c => c.match(re)).filter(Boolean)){ const name = m[1].trim(), key = name.toUpperCase(); if(!seen.has(key)){ seen.add(key); out.nominees.push({name, relationship:m[2]}); } }
+  return out;
+}
+// WhatsApp-style "*Nominee 1* / Name: ... / IC: ..." blocks → nominee objects (empty blocks dropped)
+function parseNomineeText(t){
+  const KEYS = {name:'name', nama:'name', ic:'ic', nric:'ic', 'ic no':'ic', mykad:'ic', passport:'ic', 'ic/passport':'ic', address:'address', alamat:'address',
+    relationship:'relationship', relation:'relationship', hubungan:'relationship', percentage:'share', percentages:'share', share:'share', '%':'share',
+    nationality:'nationality', warganegara:'nationality', gender:'gender', dob:'dob', 'date of birth':'dob', 'passport expiry':'expiry',
+    status:'status', 'marital status':'status', children:'children', 'no of children':'children'};
+  const blocks = t.replace(/\r/g,'').split(/^[^\n]*?nominee\s*(?=\d)/im);
+  const owner = {}, nominees = [];
+  const readKV = (s, into) => s.split('\n').forEach(line => {
+    const m = line.replace(/[*_~]/g,'').match(/^\s*([A-Za-z%][A-Za-z %\/.]*?)\s*[:：]\s*(.*)$/); if(!m) return;
+    const k = KEYS[m[1].toLowerCase().replace(/\.$/,'').trim()]; if(k && m[2].trim() && !(k in into)) into[k] = m[2].trim(); });
+  readKV(blocks[0], owner);
+  blocks.slice(1).forEach(b => { const n = {}; readKV(b.replace(/^\d+\**/, ''), n); if(n.name) nominees.push(n); });
+  return {owner, nominees};
+}
+// "Name: …" / "IC: …" pairs (any heading), or lines like "Tan Ah Kow 800101-07-5111" → [{name, ic}]
+function parsePeopleText(t){
+  const out = []; let cur = null;
+  t.replace(/\r/g, '').split('\n').forEach(raw => {
+    const line = raw.replace(/[*_~]/g, '');
+    const m = line.match(/^\s*([A-Za-z][A-Za-z \/.]*?)\s*[:：]\s*(.*)$/);
+    if(m){
+      const k = m[1].toLowerCase().trim(), v = m[2].trim();
+      if(/^(name|nama|full name)$/.test(k)){ cur = v ? {name:v} : null; if(cur) out.push(cur); }
+      else if(/^(ic|nric|ic no|mykad|passport|ic\/passport|nric\/passport|nric\/passport no)$/.test(k) && cur && v && !cur.ic) cur.ic = v;
+      return;
+    }
+    const ic = line.match(IC_RE);
+    if(ic){ const name = line.slice(0, line.indexOf(ic[1])).replace(/[-–:,(]+\s*$/, '').trim(); if(/[A-Za-z]{2}/.test(name)){ cur = {name, ic:ic[1]}; out.push(cur); } }
+  });
+  return out;
+}
+// ===== READER END =====
+
+async function pdfToLines(file){
+  if(typeof pdfjsLib === 'undefined') throw new Error('The PDF reader did not load (it needs internet the first time).');
+  const pdf = await pdfjsLib.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise; const lines = [], chunks = [];
+  for(let i = 1; i <= pdf.numPages; i++){
+    const items = (await (await pdf.getPage(i)).getTextContent()).items.filter(it => it.str.trim());
+    const rows = [];
+    items.forEach(it => { const y = it.transform[5]; let r = rows.find(r => Math.abs(r.y - y) < 3); if(!r){ r = {y, items:[]}; rows.push(r); } r.items.push(it); });
+    items.forEach(it => chunks.push(it.str.trim()));
+    rows.sort((a,b) => b.y - a.y).forEach(r => lines.push(r.items.sort((a,b) => a.transform[4]-b.transform[4]).map(it => it.str.trim()).join(' ')));
+  }
+  if(!lines.length) return ocrPdf(pdf);
+  lines.chunks = chunks;
+  return lines;
+}
+// PDF saved as a picture (no text inside): render each page, erase table borders, then OCR
+async function ocrPdf(pdf, onProgress = () => {}){
+  if(typeof Tesseract === 'undefined') throw new Error('The picture reader (OCR) did not load (it needs internet).');
+  const worker = await Tesseract.createWorker('eng'); const lines = [];
+  try{
+    for(let i = 1; i <= Math.min(pdf.numPages, 3); i++){
+      onProgress(i, pdf.numPages);
+      const S = 3, page = await pdf.getPage(i), v = page.getViewport({scale:S});
+      const c = document.createElement('canvas'); c.width = v.width; c.height = v.height;
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      await page.render({canvasContext:ctx, viewport:v}).promise;
+      const W = c.width, H = c.height, img = ctx.getImageData(0, 0, W, H), d = img.data, kill = new Uint8Array(W*H);
+      const dark = i => d[i*4] + d[i*4+1] + d[i*4+2] < 450;
+      for(let y = 0; y < H; y++){ let s = -1; for(let x = 0; x <= W; x++){ const k = x < W && dark(y*W+x); if(k && s < 0) s = x; if(!k && s >= 0){ if(x-s > 25*S) for(let q = s; q < x; q++) kill[y*W+q] = 1; s = -1; } } }
+      for(let x = 0; x < W; x++){ let s = -1; for(let y = 0; y <= H; y++){ const k = y < H && dark(y*W+x); if(k && s < 0) s = y; if(!k && s >= 0){ if(y-s > 8*S) for(let q = s; q < y; q++) kill[q*W+x] = 1; s = -1; } } }
+      for(let p = 0; p < W*H; p++) if(kill[p]) d[p*4] = d[p*4+1] = d[p*4+2] = 255;
+      ctx.putImageData(img, 0, 0);
+      const {data} = await worker.recognize(c);
+      lines.push(...data.text.split('\n').map(l => l.replace(/[|\[\]]/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean));
+    }
+  } finally { await worker.terminate(); }
+  lines.ocr = true; lines.chunks = [];
+  return lines;
+}
+
+// ---------- Quick fill: one customer at a time ----------
+const Q = id => document.getElementById(id);
+const Q_OWNER = ['policy_no','proposal_no','owner_name','owner_ic','owner_muslim','owner_status','owner_children'];
+const NOM_COLS = [['nominee_name','Full name (as per NRIC)'],['nominee_ic','NRIC / Passport'],['nominee_relationship','Relationship'],['nominee_share','Share %'],
+  ['nominee_nationality','Nationality'],['nominee_address','Mailing address (incl. postcode & town)']];
+let QUICK = [];   // [{policy_no, rows:[{key:value}]}]
+function renderNomTable(){
+  Q('nomTable').innerHTML = `<tr><th>#</th>${NOM_COLS.map(c=>`<th>${c[1]}</th>`).join('')}</tr>` +
+    [1,2,3,4].map(i => `<tr><td>${i}</td>${NOM_COLS.map(([k]) => `<td>${k==='nominee_nationality'
+      ? `<select data-n="${i}" data-k="${k}"><option value="">—</option><option>Malaysian</option><option value="__other">Other…</option></select>`
+      : `<input type="text" data-n="${i}" data-k="${k}"${k==='nominee_share'?' size="5"':''}>`}</td>`).join('')}</tr>`).join('');
+  Q('nomTable').querySelectorAll('select').forEach(s => s.onchange = () => {
+    if(s.value === '__other'){ const v = prompt('Nationality (e.g. Singaporean):'); if(v){ const o = new Option(v, v, true, true); s.add(o); } else s.value = ''; } });
+}
+const nomCell = (i,k) => Q('nomTable').querySelector(`[data-n="${i}"][data-k="${k}"]`);
+function setVal(el, v, found){
+  if(v == null || v === '') return;
+  if(el.tagName === 'SELECT' && ![...el.options].some(o => o.value.toLowerCase() === String(v).toLowerCase())) el.add(new Option(v, v));
+  if(el.tagName === 'SELECT') el.value = [...el.options].find(o => o.value.toLowerCase() === String(v).toLowerCase()).value; else el.value = v;
+  el.classList.toggle('found', !!found);
+}
+function fillNominee(n, found){
+  let i = [1,2,3,4].find(i => !nomCell(i,'nominee_name').value.trim() || nomCell(i,'nominee_name').value.trim().toUpperCase() === String(n.name).toUpperCase());
+  if(!i) return false;
+  const map = {name:'nominee_name', ic:'nominee_ic', relationship:'nominee_relationship', share:'nominee_share', nationality:'nominee_nationality', address:'nominee_address'};
+  Object.entries(map).forEach(([a,k]) => setVal(nomCell(i,k), n[a], found));
+  const extra = nomCell(i,'nominee_name').dataset; ['gender','dob','expiry'].forEach(a => { if(n[a]) extra[a] = n[a]; });
+  return true;
+}
+// ---------- Declaration, Part 2 trustees, Part 3 consent ----------
+const WIT_KEY = 'nomform_witness_v1';
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; };
+function loadWitnessDefaults(){
+  let w = {name:'', iac:''};   // filled in by build.js (blank for the public web copy)
+  try{ w = JSON.parse(localStorage.getItem(WIT_KEY) || 'null') || w; }catch(e){}
+  Q('q_wit_name').value = w.name || ''; Q('q_wit_iac').value = w.iac || '';
+}
+['q_wit_name','q_wit_iac'].forEach(id => Q(id).addEventListener('change', () => {
+  try{ localStorage.setItem(WIT_KEY, JSON.stringify({name:Q('q_wit_name').value.trim(), iac:Q('q_wit_iac').value.trim()})); }catch(e){} }));
+Q('q_wit_agent').onchange = () => { Q('witAgentBox').classList.toggle('hidden', !Q('q_wit_agent').checked); Q('witFullBox').classList.toggle('hidden', Q('q_wit_agent').checked); };
+
+let trusteeOpt = 'none';
+Q('trusteeOpts').innerHTML = Object.entries(TRUSTEE_OPTIONS).map(([k,l]) => `<button class="opt" data-opt="${k}">${l}</button>`).join('');
+const TRUSTEE_FIELDS = [['name','Full name (as per NRIC)'],['ic','NRIC / Passport'],['gender','Gender (passport only)','sel:—,M,F'],['dob','Date of birth (passport only)'],
+  ['expiry','Passport expiry (passport only)'],['nationality','Nationality','sel:—,Malaysian,Other…'],['cob','Country of birth','sel:—,Malaysian,Other…'],
+  ['tel','Tel no.'],['telType','Tel type','sel:—,Handphone,House,Office'],['address','Mailing address (incl. postcode & town)']];
+function renderTrustees(){
+  Q('trusteeOpts').querySelectorAll('.opt').forEach(b => b.classList.toggle('on', b.dataset.opt === trusteeOpt));
+  const need = !['none','revokeAll'].includes(trusteeOpt);
+  Q('trusteeBox').classList.toggle('hidden', !need);
+  if(need && !Q('trusteeBox').children.length) Q('trusteeBox').innerHTML = [1,2].map(i => `<div class="person"><b>Trustee ${i}${i===2?' (optional)':''}</b><div class="qgrid">` +
+    TRUSTEE_FIELDS.map(([k,l,sel]) => `<label${k==='address'?' style="grid-column:1/-1"':''}>${l}${sel
+      ? `<select data-t="${i}" data-k="${k}">${sel.slice(4).split(',').map(o => `<option value="${o==='—'?'':o}">${o}</option>`).join('')}</select>`
+      : `<input type="text" data-t="${i}" data-k="${k}"${['dob','expiry'].includes(k)?' placeholder="DD/MM/YYYY"':''}>`}</label>`).join('') + `</div></div>`).join('');
+  Q('trusteeBox').querySelectorAll('select').forEach(s => s.onchange = () => {
+    if(s.value === 'Other…'){ const v = prompt(s.dataset.k === 'cob' ? 'Country of birth:' : 'Nationality:'); if(v){ s.add(new Option(v, v, true, true)); } else s.value = ''; } });
+}
+Q('trusteeOpts').onclick = e => { const b = e.target.closest('.opt'); if(!b) return; trusteeOpt = b.dataset.opt; renderTrustees(); };
+
+function addConsentRow(v = {}){
+  const box = Q('consentBox'); if(box.children.length >= 4){ alert('The form has room for 4 people.'); return; }
+  box.insertAdjacentHTML('beforeend', `<div class="person"><div class="qgrid">
+    <label>Full name<input type="text" data-c="name" value="${esc(v.name||'')}"></label>
+    <label>NRIC / Passport<input type="text" data-c="ic" value="${esc(v.ic||'')}"></label>
+    <label style="justify-content:flex-end"><button class="small" type="button">Remove</button></label></div></div>`);
+  const row = box.lastElementChild; row.querySelector('button').onclick = () => row.remove();
+}
+Q('consentAdd').onclick = () => addConsentRow();
+Q('consentParse').onclick = () => {
+  const people = parsePeopleText(Q('consentText').value);
+  const have = new Set([...Q('consentBox').querySelectorAll('[data-c="name"]')].map(i => up(i.value)));
+  let added = 0;
+  people.forEach(p => { if(have.has(up(p.name)) || Q('consentBox').children.length >= 4) return; addConsentRow(p); have.add(up(p.name)); added++; });
+  Q('consentMsg').textContent = people.length ? `Added ${added} person${added===1?'':'s'} — check them.${people.length > added ? ' (skipped duplicates / over 4)' : ''}` : 'No "Name: …" line found in the text.';
+};
+Q('consentText').addEventListener('paste', () => setTimeout(() => Q('consentParse').click(), 0));
+
+function updateShareChip(){
+  const total = [1,2,3,4].reduce((a,i) => a + (shareNum(nomCell(i,'nominee_share').value) || 0), 0);
+  const chip = Q('shareChip'); chip.textContent = `Shares ${+total.toFixed(2)}% of 100%`;
+  chip.className = 'pill ' + (Math.abs(total-100) < 0.001 ? 'ok' : total > 100 ? 'bad' : 'warn');
+}
+Q('nomTable').addEventListener('input', updateShareChip);
+
+function collectExtras(){
+  const v = id => Q(id).value.trim();
+  const witness = Q('q_wit_agent').checked ? {agent:true, name:v('q_wit_name'), iac:v('q_wit_iac')}
+    : {agent:false, name:v('q_witf_name'), ic:v('q_witf_ic'), dob:v('q_witf_dob'), expiry:v('q_witf_expiry'), address:v('q_witf_address')};
+  const trustees = [1,2].map(i => Object.fromEntries(TRUSTEE_FIELDS.map(([k]) => { const el = Q('trusteeBox').querySelector(`[data-t="${i}"][data-k="${k}"]`); return [k, el ? el.value.trim() : '']; })));
+  const consent = [...Q('consentBox').children].map(r => ({name:r.querySelector('[data-c="name"]').value.trim(), ic:r.querySelector('[data-c="ic"]').value.trim()}));
+  return {date:v('q_date'), witness, trusteeOption:trusteeOpt, trustees, consent};
+}
+function resetExtras(){
+  Q('q_date').value = todayISO(); Q('q_wit_agent').checked = true; Q('q_wit_agent').onchange(); loadWitnessDefaults();
+  ['q_witf_name','q_witf_ic','q_witf_dob','q_witf_expiry','q_witf_address'].forEach(id => Q(id).value = '');
+  trusteeOpt = 'none'; Q('trusteeBox').innerHTML = ''; renderTrustees(); Q('consentBox').innerHTML = ''; Q('consentText').value = ''; Q('consentMsg').textContent = '';
+}
+
+function resetQuick(){
+  resetExtras();
+  Q_OWNER.forEach(k => { const el = Q('q_'+k); el.value = ''; el.classList.remove('found'); });
+  Q('polList').innerHTML = ''; Q('polMsg').innerHTML = ''; Q('waText').value = ''; Q('waMsg').textContent = ''; Q('nomSuggest').innerHTML = '';
+  Q('polPdf').value = ''; renderNomTable(); updateShareChip();
+}
+Q('polPdf').addEventListener('change', async e => {
+  const files = [...e.target.files]; if(!files.length) return;
+  const msg = Q('polMsg'); msg.innerHTML = `<div class="msg">Reading ${files.length} PDF… if it's a picture-type PDF this takes about 15–30 seconds.</div>`;
+  try{
+    const lines = [], chunks = []; let ocr = false;
+    for(const f of files){ const l = await pdfToLines(f); lines.push(...l); chunks.push(...l.chunks); ocr = ocr || !!l.ocr; }
+    lines.chunks = chunks;
+    if(!lines.length){ msg.innerHTML = `<div class="msg warn">Couldn't read anything from this PDF. Please type the details below.</div>`; log(`Policy PDF "${files.map(f=>f.name).join(', ')}": nothing readable`); return; }
+    const info = extractPolicyInfo(lines); const got = [];
+    Q('polList').innerHTML = info.policies.map(p => `<option value="${esc(p)}">`).join('');
+    if(info.policies.length === 1){ setVal(Q('q_policy_no'), info.policies[0], true); got.push('policy no.'); }
+    ['owner_name','owner_ic','owner_muslim'].forEach(k => { if(info[k]){ setVal(Q('q_'+k), info[k], true); got.push({owner_name:'name', owner_ic:'NRIC', owner_muslim:'Muslim / Non-Muslim'}[k]); } });
+    Q('nomSuggest').innerHTML = info.nominees.length ? `<p class="hint" style="margin:8px 0 0">Nominee names seen in the PDF — click to add (then complete IC, share and address):</p>` +
+      info.nominees.map((n,i) => `<button class="small chip" data-i="${i}">+ ${esc(n.name)} (${esc(n.relationship)})</button>`).join('') : '';
+    Q('nomSuggest').querySelectorAll('button').forEach(b => b.onclick = () => { fillNominee(info.nominees[+b.dataset.i], true); b.disabled = true; });
+    const multi = info.policies.length > 1 ? ` This PDF lists <b>${info.policies.length} policy numbers</b> — click the Policy No. box to pick the right one.` : '';
+    const ocrNote = ocr ? ' <b>This PDF is a picture, so it was read by OCR — compare each green box with the PDF letter by letter.</b>' : '';
+    msg.innerHTML = `<div class="msg ${got.length && !ocr ? 'ok' : 'warn'}">${got.length ? `Found: <b>${got.join(', ')}</b> (green boxes) — please check them.` : 'Could not find the policyowner details in this PDF.'}${multi}${ocrNote} Fill in anything still blank.</div>`;
+    log(`Read policy PDF "${files.map(f=>f.name).join(', ')}"${ocr?' by OCR':''}: found ${got.join(', ') || 'nothing'}${info.policies.length>1?`; ${info.policies.length} policy nos. listed`:''}${info.nominees.length?`; ${info.nominees.length} nominee name(s)`:''}`);
+  }catch(err){ msg.innerHTML = `<div class="msg bad">Couldn't read this PDF: ${esc(err.message)}</div>`; log('Policy PDF read failed: ' + err.message); }
+});
+const tableHasNominee = () => [1,2,3,4].some(i => NOM_COLS.some(([k]) => nomCell(i,k).value.trim()));
+// read pasted WhatsApp text automatically, so forgetting the button doesn't lose the nominees
+Q('waText').addEventListener('paste', () => setTimeout(() => Q('waParse').click(), 0));
+Q('waText').addEventListener('blur', () => { if(Q('waText').value.trim() && !tableHasNominee()) Q('waParse').click(); });
+Q('waParse').onclick = () => {
+  const r = parseNomineeText(Q('waText').value);
+  if(r.owner.status) setVal(Q('q_owner_status'), STATUS[r.owner.status.toLowerCase()] || r.owner.status, true);
+  if(r.owner.children) setVal(Q('q_owner_children'), NO.test(r.owner.children) ? '0' : r.owner.children, true);
+  let added = 0; r.nominees.forEach(n => { if(fillNominee(n, true)) added++; });
+  updateShareChip();
+  Q('waMsg').textContent = added ? `Added ${added} nominee${added>1?'s':''} to the table — check them.` : 'No nominee with a name found in the text.';
+};
+Q('quickAdd').onclick = () => {
+  const owner = Object.fromEntries(Q_OWNER.map(k => [k, Q('q_'+k).value.trim()]));
+  const msg = Q('quickMsg');
+  if(!owner.policy_no){ msg.innerHTML = `<div class="msg bad">Please fill in the Policy No.</div>`; return; }
+  if(!tableHasNominee() && Q('waText').value.trim()) Q('waParse').click();
+  if(!Q('consentBox').children.length && Q('consentText').value.trim()) Q('consentParse').click();
+  if(!tableHasNominee()){
+    msg.innerHTML = `<div class="msg bad">No nominee in the table yet. Paste the WhatsApp details and click <b>Read nominees from text</b>, or type the nominee into the table — then click Add again.${Q('waText').value.trim() ? '<br>The pasted text has no line like <b>Name: …</b> under a <b>Nominee 1</b> heading, so it could not be read.' : ''}</div>`;
+    Q('nomTable').scrollIntoView({behavior:'smooth', block:'center'}); return;
+  }
+  const noms = [1,2,3,4].map(i => {
+    const n = Object.fromEntries(NOM_COLS.map(([k]) => [k, nomCell(i,k).value.trim()]));
+    const d = nomCell(i,'nominee_name').dataset; n.nominee_gender = d.gender || ''; n.nominee_dob = d.dob || ''; n.nominee_passport_expiry = d.expiry || '';
+    return n; }).filter(n => NOM_COLS.some(([k]) => n[k]));
+  const rows = (noms.length ? noms : [{}]).map(n => ({...owner, ...n}));
+  QUICK = QUICK.filter(c => up(c.policy_no) !== up(owner.policy_no)).concat([{policy_no: owner.policy_no, rows, extras: collectExtras()}]);
+  log(`Quick fill: added policy ${owner.policy_no} (${noms.length} nominee${noms.length===1?'':'s'})`);
+  runQuick();
+  resetQuick();
+  msg.innerHTML = `<div class="msg ok">Added policy <b>${esc(owner.policy_no)}</b>. Check the results in step 2 below, or add another customer.</div>`;
+};
+Q('quickClear').onclick = () => { QUICK = []; resetQuick(); Q('quickMsg').innerHTML = ''; Q('quickCount').textContent = '';
+  ['digestCard','previewCard','approveCard'].forEach(id => Q(id).classList.add('hidden')); };
+function runQuick(){
+  const head = FIELDS.map(f => f.label);
+  const table = [head, ...QUICK.flatMap(c => c.rows.map(r => FIELDS.map(f => r[f.key] || '')))];
+  Q('quickCount').textContent = `${QUICK.length} customer${QUICK.length===1?'':'s'} added`;
+  loadTable(table, `Quick fill (${QUICK.length} customer${QUICK.length===1?'':'s'}: ${QUICK.map(c=>c.policy_no).join(', ')})`,
+    Object.fromEntries(QUICK.map(c => [up(c.policy_no), c.extras])));
+  Q('digestCard').scrollIntoView({behavior:'smooth'});
+}
+renderNomTable(); resetExtras(); updateShareChip();
+
+// ---------- Utils ----------
+function download(name, data, type){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], {type})); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+if(NO_BUILT_IN_FORM){
+  // No form inside this copy (web version): the user picks the blank form once; it is kept in this browser only (IndexedDB), never uploaded.
+  const idb = () => new Promise((res, rej) => { const r = indexedDB.open('nomform', 1); r.onupgradeneeded = () => r.result.createObjectStore('files'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const idbGet = async k => { const db = await idb(); return new Promise(res => { const q = db.transaction('files').objectStore('files').get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }); };
+  const idbPut = async (k, v) => { const db = await idb(); return new Promise(res => { const t = db.transaction('files', 'readwrite'); t.objectStore('files').put(v, k); t.oncomplete = res; t.onerror = res; }); };
+  document.querySelector('header').insertAdjacentHTML('afterend', `<div class="msg warn" id="formBanner" style="margin:16px;border-radius:8px"></div>`);
+  const banner = document.getElementById('formBanner');
+  const askForm = () => {
+    banner.className = 'msg warn';
+    banner.innerHTML = `<b>First time on this browser:</b> choose the blank <b>Nomination Form.pdf</b> (form NBZ-FNOMI-V07-082025) — <input type="file" id="formPick" accept=".pdf">
+      <br><span class="hint" style="margin:0">It stays in this browser only and is remembered for next time. Nothing you enter or upload on this page is sent anywhere.</span>`;
+    document.getElementById('formPick').onchange = async e => {
+      const f = e.target.files[0]; if(!f) return;
+      FORM_BYTES = new Uint8Array(await f.arrayBuffer());
+      try{ await idbPut('form', {name:f.name, bytes:FORM_BYTES}); }catch(err){}
+      showLoaded(f.name); log(`Blank form loaded from "${f.name}"`);
+    };
+  };
+  const showLoaded = name => {
+    banner.className = 'msg ok';
+    banner.innerHTML = `Blank form ready: <b>${esc(name)}</b> (remembered in this browser). <button class="small" id="formChange">Change</button>`;
+    document.getElementById('formChange').onclick = askForm;
+  };
+  askForm();
+  idbGet('form').then(v => { if(v && v.bytes && !FORM_BYTES){ FORM_BYTES = new Uint8Array(v.bytes); showLoaded(v.name); } }).catch(() => {});
+}
+document.getElementById('logDl').onclick = () => download('nomination_agent_log.txt', logText(), 'text/plain');
+document.getElementById('logClear').onclick = () => { if(confirm('Clear the whole run log?')){ writeLog([]); MEMLOG = MEMLOG && []; currentRun = null; renderLog(); } };
+renderLog();
+</script>
+</body>
+</html>
